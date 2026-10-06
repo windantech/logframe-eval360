@@ -1,9 +1,14 @@
 # Eval360 · Your organisation, set up by AI
 
-A public Eval360 demonstration that sets itself up for **your organisation**. Enter the organisation's
-name and website: AI reads the website and builds the organisation profile, strategic goals and a list of
-programmes. For each programme, upload its logframe (PDF, Word, Excel, CSV or text) or let AI draft a
-realistic one. Review everything, then Eval360 runs on it, in your brand colours: executive dashboard
+A public Eval360 demonstration that sets itself up for **your programmes**. Two ways in:
+
+- **Start from your logframe(s)** — upload one or several (PDF, Word, Excel, CSV or text). Each becomes a
+  programme. No organisation name or website is needed; the name is taken from the logframe.
+- **Start from your organisation** — enter its name and website: AI reads the website and builds the
+  profile, strategic goals and a list of programmes. For each programme, upload its logframe or let AI
+  draft a realistic one.
+
+Strategic goals are optional and can be added later. Review everything, then Eval360 runs on it, in your brand colours: executive dashboard
 across programmes, strategic goals, portfolio, a dashboard, logframe matrix, results chain and indicators
 per programme, a verification workflow, framework quality, an audit trail and printable reports.
 

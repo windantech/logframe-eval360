@@ -7,6 +7,7 @@ if (location.hash === '#e2e') (async () => {
     await im_checkStatus();
     ok('Status endpoint reports AI available (mock)', appData.ai.available && appData.ai.mock);
     ok('First visit opens the set-up wizard', currentView === 'setup');
+    localStorage.removeItem(STORE_KEY);
     // File converters
     const fileFrom = async (path, name, type) => new File([await (await fetch(path)).blob()], name, {type});
     const docx = await im_filePayload(await fileFrom('samples/sample_logframe.docx', 'sample_logframe.docx', ''));
@@ -19,7 +20,24 @@ if (location.hash === '#e2e') (async () => {
     ok('Excel (.xlsx) converted in the browser', xl.kind === 'text' && xl.text.includes('Teachers trained,0,400'));
     let bad = null; try { await im_filePayload(new File(['x'], 'old.doc')); } catch(e){ bad = e.message; }
     ok('Old .doc rejected with advice', !!bad && bad.includes('.docx'));
-    // Step 1 — organisation and website
+    // OPTION A — logframes only: no name, no website
+    const sa = su();
+    sa.uploads = [{key:'ua', filename:'sample_logframe.docx', payload:docx, error:null}, {key:'ub', filename:'youth_programme.pdf', payload:pdf, error:null}];
+    ACTIONS['su-from-logframes']();
+    for (let i = 0; i < 100 && appData.setup.stage !== 'review'; i++) await new Promise(r => setTimeout(r, 100));
+    ok('A: two logframes built without a website; review opened', appData.setup.stage === 'review' && appData.setup.programmes.every(p => p.status === 'ready'), appData.setup.programmes.map(p => p.status + ':' + (p.error || '')).join(', '));
+    ok('A: programmes named from their logframes', appData.setup.programmes.every(p => p.name.startsWith('Mock extraction')), appData.setup.programmes.map(p => p.name).join(' | '));
+    ok('A: organisation name taken from the logframe', appData.setup.org.name === 'Mock organisation', appData.setup.org.name);
+    ACTIONS['rv-accept']();
+    ok('A: live with two programmes and no goals', appData.programmes.length === 2 && appData.org.goals.length === 0 && appData.org.source.kind === 'logframe' && appData.programmes.every(p => p.source.kind === 'upload'));
+    ok('A: every screen draws without a website or goals', Object.keys(VIEW_RENDERERS).every(v => { try { VIEW_RENDERERS[v](v === 'indicator-detail' ? allInds()[0].id : v === 'result-detail' ? allInds()[0].node : ''); destroyCharts(); return true; } catch(e){ out.push('  ' + v + ': ' + e.message); return false; } }));
+    const gf = new FormData(); gf.set('code', 'SG1'); gf.set('statement', 'Universal access to safe water'); gf.append('prog', 'P1');
+    const gform = document.createElement('form'); gform.dataset.i = '-1';
+    SUBMITS['st-goal-form'](gform, gf);
+    ok('A: goal added later and linked to a programme', appData.org.goals.length === 1 && appData.programmes[0].goalCodes.includes('SG1') && goalIndex('SG1') !== null);
+    appData.setup = null;
+    // OPTION B — organisation and website
+
     const fd = new FormData(); fd.set('name', 'Kijani Water Trust'); fd.set('website', SITE); fd.set('country', 'Kenya'); fd.set('description', 'We drill boreholes.');
     await SUBMITS['su-org-form'](document.createElement('form'), fd);
     const s = appData.setup;
@@ -32,7 +50,7 @@ if (location.hash === '#e2e') (async () => {
     ACTIONS['su-build']();
     for (let i = 0; i < 100 && appData.setup.stage !== 'review'; i++) await new Promise(r => setTimeout(r, 100));
     ok('Both programmes built; review opened', appData.setup.stage === 'review' && currentView === 'review', appData.setup.programmes.map(p => p.status + ':' + (p.error || '')).join(', '));
-    ok('Nothing live before review', appData.org.name === 'Sample Development Agency');
+    ok('Nothing live before review', appData.org.name === 'Mock organisation');
     // Edit during review, then accept
     const p0 = appData.setup.programmes[0], ind = p0.fw.indicators[0];
     CHANGES['rv-ind']({dataset:{pk:p0.key, id:ind.id, f:'target'}, value:'77', classList:{toggle(){}}});

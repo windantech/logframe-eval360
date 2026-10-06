@@ -727,7 +727,7 @@ button.mini:hover{border-color:var(--brand)}
       </div>
       <div class="tb-tools">
         <span class="chip grey" id="ai-pill" title="AI import status"><i class="bi bi-stars"></i> AI import</span>
-        <button class="btn btn-sm btn-primary" data-action="go" data-view="setup"><i class="bi bi-stars"></i> <span class="hide-sm">Set up your organisation</span></button>
+        <button class="btn btn-sm btn-primary" data-action="go" data-view="setup"><i class="bi bi-stars"></i> <span class="hide-sm">Set up / import</span></button>
       </div>
     </header>
     <div class="demo-strip"><i class="bi bi-info-circle-fill"></i>
@@ -838,7 +838,7 @@ const NAV = [
   {group:'Reports', items:[
     {key:'reports',    icon:'bi-file-earmark-text', label:'Reports & export'}]},
   {group:'Set-up', items:[
-    {key:'setup',      icon:'bi-stars',             label:'Set up your organisation'},
+    {key:'setup',      icon:'bi-stars',             label:'Set up / import'},
     {key:'review',     icon:'bi-ui-checks',         label:'Review AI results'},
     {key:'settings',   icon:'bi-sliders',           label:'Branding & settings'},
     {key:'about',      icon:'bi-info-circle',       label:'How this works'}]}
@@ -1059,6 +1059,12 @@ function normaliseOrg(p, site, source){
     warnings:(p.warnings || []).map(str).filter(Boolean)};
 }
 const hexOk = h => /^#[0-9a-f]{6}$/i.test(String(h || '')) ? String(h).toLowerCase() : (/^#[0-9a-f]{3}$/i.test(String(h || '')) ? '#' + String(h).slice(1).split('').map(c => c + c).join('').toLowerCase() : null);
+/* An organisation known only from its logframes — no website, no goals until the visitor adds them. */
+function minimalOrg(name, source){
+  return {name, short:initialsOf(name), website:'', type:'', sector:'', country:'', summary:'', mission:'', vision:'', values:[], focus:[], founded:'', hq:'',
+    facts:[], goals:[], brand:{primary:null, swatches:[], logo:null, logoAlt:null}, source:Object.assign({basis:'logframe', pages:[], siteError:null}, source || {}), warnings:[]};
+}
+const nextGoalCode = goals => `SG${Math.max(0, ...goals.map(g => Number(String(g.code).replace(/\D/g, '')) || 0)) + 1}`;
 const initialsOf = name => (name.match(/\b[A-Z]/g) || [name.slice(0, 1).toUpperCase()]).slice(0, 4).join('') || 'ORG';
 function makeProgramme(pp, fw, source, i){
   return {id:`P${i + 1}`, name:str(pp.name) || fw.title, short:str(pp.short_name) || initialsOf(str(pp.name) || fw.title), description:str(pp.description) || fw.summary,
@@ -1596,7 +1602,7 @@ async function apiPost(endpoint, body){
 }
 
 /* ── Wizard state ────────────────────────────────────────────────────────── */
-const SU_STAGES = [['org','Organisation'], ['programmes','Programmes'], ['building','Building'], ['review','Review'], ['live','Live']];
+const SU_STAGES = [['org','Start'], ['programmes','Programmes'], ['building','Building'], ['review','Review'], ['live','Live']];
 const su = () => appData.setup || (appData.setup = {stage:'org', form:{name:'', website:'', country:'', description:''}, programmes:[], error:null});
 let su_key = 0;
 const su_prog = key => su().programmes.find(p => p.key === key);
@@ -1613,25 +1619,38 @@ VIEW_RENDERERS['setup'] = () => {
   const err = s.error ? banner('bad', 'bi-exclamation-octagon', esc(s.error)) : '';
   let body = '';
   if (s.stage === 'org' || s.stage === 'reading'){
-    const f = s.form, busy = s.stage === 'reading';
-    body = `<div class="wiz-hero"><h1>Set up Eval360 for your organisation</h1>
-        <p>Tell us who you are. AI reads your public website, builds your organisation profile and strategic goals, and sets up a performance dashboard for each of your programmes — from your logframes, or drafted for you.</p></div>
+    const f = s.form, busy = s.stage === 'reading' || s.converting, up = s.uploads || [];
+    const okUps = up.filter(u => u.payload);
+    body = `<div class="wiz-hero"><h1>See Eval360 running on your programmes</h1>
+        <p>Start from your logframes, from your organisation’s website — or both. AI reads them, you review what it found, and Eval360 builds a dashboard for every programme.</p></div>
       ${!ai.checked ? '' : !ai.available ? banner('warn', 'bi-exclamation-triangle', `${ai.offline ? 'AI set-up works on the hosted demo, not from a file opened on your computer.' : 'AI is not configured on this server yet.'} You can still explore the sample organisation.`) : ''}
       ${err}
-      <div class="wiz-card"><h2>Your organisation</h2><p class="lead">Only the name is required. With a website, the profile is built from what you publish — every fact keeps a link to the page it came from.</p>
+      <div class="grid-2" style="gap:16px;align-items:stretch">
+      <div class="wiz-card" style="margin:0"><div class="m-code" style="margin-bottom:6px"><i class="bi bi-file-earmark-arrow-up"></i> OPTION A</div><h2>Start from your logframe(s)</h2>
+        <p class="lead">Upload one or more logframes — each becomes a programme with its own dashboard, matrix and indicators. No website needed.</p>
+        <label class="drop" for="su-files" style="padding:22px 16px"><i class="bi bi-cloud-arrow-up"></i><b style="font-size:15px">Choose logframe files</b>
+          <span class="small">PDF, Word (.docx), Excel (.xlsx), CSV or text · several at once</span></label>
+        <input type="file" id="su-files" data-action="su-files" multiple accept=".pdf,.docx,.xlsx,.xlsm,.xls,.ods,.csv,.tsv,.txt,.md" style="display:none" ${busy || !ai.available ? 'disabled' : ''}>
+        ${up.length ? `<div style="margin-top:10px">${up.map(u => `<div class="brow" style="padding:7px 0">${u.payload ? '<i class="bi bi-file-earmark-check" style="color:var(--ok)"></i>' : u.error ? '<i class="bi bi-x-circle" style="color:var(--bad)"></i>' : '<div class="spin" style="width:16px;height:16px;border-width:2px"></div>'}
+            <div style="flex:1;min-width:0"><div style="font-weight:500;overflow:hidden;text-overflow:ellipsis">${esc(u.filename)}</div>${u.error ? `<div class="small" style="color:var(--bad)">${esc(u.error)}</div>` : u.payload ? `<div class="small muted">${u.payload.kind === 'pdf' ? 'PDF — sent as it is' : num(u.payload.chars) + ' characters read'}</div>` : '<div class="small muted">Reading…</div>'}</div>
+            <button class="x btn btn-sm btn-ghost" data-action="su-up-del" data-key="${u.key}" aria-label="Remove ${esc(u.filename)}"><i class="bi bi-x-lg"></i></button></div>`).join('')}</div>` : ''}
+        <div class="fld" style="margin-top:12px"><label for="su-lf-org">Organisation name <span class="muted">(optional — taken from the logframe if left blank)</span></label>
+          <input id="su-lf-org" data-action="su-lf-org" value="${esc(s.lfOrg || '')}" placeholder="e.g. Kijani Water Trust"></div>
+        <div style="margin-top:14px"><button class="btn btn-primary" data-action="su-from-logframes" ${okUps.length && !busy && ai.available ? '' : 'disabled'}><i class="bi bi-magic"></i> Build from ${okUps.length ? plural(okUps.length, 'logframe') : 'logframes'}</button></div></div>
+      <div class="wiz-card" style="margin:0"><div class="m-code" style="margin-bottom:6px"><i class="bi bi-globe2"></i> OPTION B</div><h2>Start from your organisation</h2>
+        <p class="lead">AI reads your public website and proposes your profile, strategic goals and programmes. You can still upload a logframe for any programme on the next step.</p>
         <form id="su-org-form" data-action="su-org-form"><div class="form-grid">
-          <div class="fld"><label for="su-name">Organisation name</label><input id="su-name" name="name" required value="${esc(f.name)}" placeholder="e.g. Kenya Red Cross Society" ${busy ? 'disabled' : ''}></div>
-          <div class="fld"><label for="su-web">Website</label><input id="su-web" name="website" value="${esc(f.website)}" placeholder="e.g. www.example.org" ${busy ? 'disabled' : ''}></div>
+          <div class="fld full"><label for="su-name">Organisation name</label><input id="su-name" name="name" required value="${esc(f.name)}" placeholder="e.g. Kenya Red Cross Society" ${busy ? 'disabled' : ''}></div>
+          <div class="fld"><label for="su-web">Website</label><input id="su-web" name="website" value="${esc(f.website)}" placeholder="www.example.org" ${busy ? 'disabled' : ''}></div>
           <div class="fld"><label for="su-country">Country</label><input id="su-country" name="country" value="${esc(f.country)}" placeholder="Optional" ${busy ? 'disabled' : ''}></div>
           <div class="fld full"><label for="su-desc">What do you do? <span class="muted">(optional — helps when there is no website)</span></label>
-            <textarea id="su-desc" name="description" rows="3" placeholder="Our mandate, the programmes we run, where and for whom." ${busy ? 'disabled' : ''}>${esc(f.description)}</textarea></div></div>
-          <div style="display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap">
-            ${busy ? `<div class="busy" style="flex:1"><div class="spin"></div><div><b>Reading ${esc(f.website || f.name)}</b><div class="small">Visiting the homepage and up to five pages about your work, then building the profile — usually 20 to 60 seconds.</div></div></div>`
-              : `<button class="btn btn-primary" type="submit" ${ai.available ? '' : 'disabled'}><i class="bi bi-stars"></i> Read our organisation</button>
-                 <button class="btn" type="button" data-action="su-sample"><i class="bi bi-journal-text"></i> Explore the sample organisation</button>`}
-          </div></form>
-        <p class="small muted" style="margin:14px 0 0;line-height:1.6"><i class="bi bi-shield-check"></i> Website pages and any logframes you upload are sent to OpenAI to build the demo, and are not stored on this server. Your set-up is kept only in this browser.
-          ${ai.available && ai.remaining !== null && ai.remaining !== undefined ? ` · ${plural(ai.remaining, 'AI request')} left today` : ''}</p></div>`;
+            <textarea id="su-desc" name="description" rows="2" placeholder="Our mandate, the programmes we run, where and for whom." ${busy ? 'disabled' : ''}>${esc(f.description)}</textarea></div></div>
+          <div style="margin-top:14px">${s.stage === 'reading' ? `<div class="busy"><div class="spin"></div><div><b>Reading ${esc(f.website || f.name)}</b><div class="small">The homepage and up to five pages about your work — usually 20 to 60 seconds.</div></div></div>`
+            : `<button class="btn btn-primary" type="submit" ${ai.available && !busy ? '' : 'disabled'}><i class="bi bi-stars"></i> Read our organisation</button>`}</div></form></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px">
+        <p class="small muted" style="margin:0;line-height:1.6;max-width:72ch"><i class="bi bi-shield-check"></i> Website pages and logframes are sent to OpenAI to build the demo and are not stored on this server. Your set-up is kept only in this browser.
+          ${ai.available && ai.remaining !== null && ai.remaining !== undefined ? ` · ${plural(ai.remaining, 'AI request')} left today` : ''}</p>
+        <button class="btn" type="button" data-action="su-sample"><i class="bi bi-journal-text"></i> Explore the sample organisation</button></div>`;
   }
   else if (s.stage === 'programmes') body = su_programmesStage(s, err);
   else if (s.stage === 'building') body = su_buildingStage(s, err);
@@ -1654,6 +1673,29 @@ SUBMITS['su-org-form'] = async (form, fd) => {
     addLog(`read ${d.site.pages.length ? plural(d.site.pages.length, 'website page') : 'the description'} and built a profile for ${s.org.name}`, {view:'setup', meta:''}, 'bi-globe2');
   } catch(e){ s.stage = 'org'; s.error = e.message; }
   redraw();
+};
+/* ── Option A: logframes first, organisation optional ─────────────────────── */
+CHANGES['su-files'] = async t => {
+  const s = su(), files = [...(t.files || [])]; t.value = '';
+  if (!files.length) return;
+  s.uploads = s.uploads || [];
+  const rows = files.map(f => { const u = {key:`u${Date.now().toString(36)}${++su_key}`, filename:f.name, payload:null, error:null}; s.uploads.push(u); return [u, f]; });
+  s.converting = true; redraw();
+  for (const [u, f] of rows){ try { u.payload = await im_filePayload(f); } catch(e){ u.error = e.message; } redraw(); }
+  s.converting = false; redraw();
+};
+ACTIONS['su-up-del'] = t => { const s = su(); s.uploads = (s.uploads || []).filter(u => u.key !== t.dataset.key); redraw(); };
+CHANGES['su-lf-org'] = t => { su().lfOrg = t.value.trim(); saveState(); };
+/* A programme's name from its file name until the logframe says otherwise. */
+const nameFromFile = fn => String(fn).replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^./, c => c.toUpperCase()) || 'Programme';
+ACTIONS['su-from-logframes'] = () => {
+  const s = su(), ok = (s.uploads || []).filter(u => u.payload);
+  if (!ok.length){ toast('Choose at least one logframe file.', 'warn'); return; }
+  const name = s.lfOrg || '';
+  s.path = 'logframe'; s.addOnly = false; s.error = null;
+  s.org = minimalOrg(name || 'My organisation', {kind:'logframe', nameGiven:!!name});
+  s.programmes = ok.map(u => su_newProg({name:nameFromFile(u.filename), short:'', mode:'upload', filename:u.filename, payload:u.payload, autoName:true}));
+  s.stage = 'building'; saveState(); redraw(); su_runAll();
 };
 ACTIONS['su-sample'] = () => {
   loadSample(); appData.setup = null; saveState();
@@ -1693,12 +1735,14 @@ function su_programmesStage(s, err){
             ${o.brand.logo ? `<img class="brand-img" src="${esc(o.brand.logo)}" alt="" style="height:34px;max-width:120px;object-fit:contain;margin-left:8px;border-radius:6px;background:#fff;padding:2px">` : ''}</div>
           <div class="small muted" style="margin-top:6px">${sw.length ? 'Colours found on your website.' : 'Pick your brand colour.'} The whole demo takes this colour.</div>
           <div class="m-code" style="margin:16px 0 6px">STRATEGIC GOALS</div>
-          ${o.goals.map(g => `<div class="fact"><div class="fc">${esc(g.code)}</div><div style="flex:1">${esc(g.statement)} ${g.basis === 'stated' ? webBadge('Stated') : draftBadge('Proposed')}</div></div>`).join('')}</div></div>
+          ${o.goals.map(g => `<div class="fact"><div class="fc">${esc(g.code)}</div><div style="flex:1">${esc(g.statement)} ${g.basis === 'stated' ? webBadge('Stated') : draftBadge('Proposed')}</div></div>`).join('') || '<div class="small muted">None found — optional; you can add goals on the review.</div>'}</div></div>
       ${o.warnings.length ? `<div class="small" style="margin-top:10px;color:var(--warn)"><i class="bi bi-info-circle"></i> ${o.warnings.map(esc).join(' · ')}</div>` : ''}</div>
     <div class="wiz-card"><h2>Your programmes</h2><p class="lead">For each programme, upload its logframe if you have one, or let AI draft a realistic one from what you do. Add any programme that is missing.</p>
       ${s.programmes.map(row).join('')}
       <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap">
-        <button class="btn btn-sm" data-action="su-add"><i class="bi bi-plus-lg"></i> Add a programme</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm" data-action="su-add"><i class="bi bi-plus-lg"></i> Add a programme</button>
+          <label class="btn btn-sm" for="su-more"><i class="bi bi-file-earmark-arrow-up"></i> Add programmes from logframes</label>
+          <input type="file" id="su-more" data-action="su-more" multiple accept=".pdf,.docx,.xlsx,.xlsm,.xls,.ods,.csv,.tsv,.txt,.md" style="display:none"></div>
         <div style="display:flex;gap:8px"><button class="btn" data-action="su-back">Back</button>
         <button class="btn btn-primary" data-action="su-build" ${active.length ? '' : 'disabled'}><i class="bi bi-magic"></i> Build ${plural(active.length, 'programme')}</button></div></div></div>`;
 }
@@ -1715,6 +1759,12 @@ ACTIONS['su-swatch'] = t => { su().org.brand.primary = hexOk(t.dataset.c); saveS
 CHANGES['su-colour'] = t => { su().org.brand.primary = hexOk(t.value); saveState(); su_previewBrand(); redraw(); };
 function su_previewBrand(){ const o = su().org, t = brandTokens(o.brand.primary); if (t) Object.entries(t).forEach(([k, v]) => document.documentElement.style.setProperty(k, v)); }
 ACTIONS['su-add'] = () => { const s = su(); s.programmes.push(su_newProg({name:'New programme', description:'', basis:'stated', mode:'upload'})); saveState(); redraw(); };
+CHANGES['su-more'] = async t => {
+  const s = su(), files = [...(t.files || [])]; t.value = '';
+  for (const f of files){ const p = su_newProg({name:nameFromFile(f.name), mode:'upload', filename:f.name, autoName:true}); s.programmes.push(p); redraw();
+    try { p.payload = await im_filePayload(f); } catch(e){ p.error = e.message; p.filename = ''; } redraw(); }
+  saveState();
+};
 ACTIONS['su-back'] = () => { su().stage = 'org'; saveState(); redraw(); };
 
 /* ── Stage: building — one AI call per programme, two at a time ─────────── */
@@ -1737,6 +1787,9 @@ async function su_runOne(p){
     else d = await apiPost('draft.php', {org:{name:s.org.name, type:s.org.type, sector:s.org.sector, country:s.org.country, summary:s.org.summary, mission:s.org.mission},
       programme:{name:p.name, description:p.description, location:p.location, target_group:p.targetGroup}});
     p.raw = d.framework;
+    if (p.autoName && str(d.framework.title)){ p.name = str(d.framework.title); p.short = ''; }
+    if (s.org && s.org.source.kind === 'logframe' && !s.org.source.nameGiven && str(d.framework.organisation)){ s.org.name = str(d.framework.organisation); s.org.short = initialsOf(s.org.name); s.org.source.nameGiven = true; }
+    if (!p.short) p.short = initialsOf(p.name).slice(0, 6);
     p.source = {kind:p.mode === 'upload' ? 'upload' : 'drafted', filename:p.mode === 'upload' ? p.filename : null, model:d.meta.model, at:d.meta.generated_at || d.meta.extracted_at, reviewedAt:null};
     p.fw = null; p.status = 'ready';
   } catch(e){ p.status = 'error'; p.error = e.message; }
@@ -1810,9 +1863,12 @@ VIEW_RENDERERS['review'] = () => {
         <div class="fld full"><label>Summary</label><textarea data-action="rv-org" data-f="summary" rows="2">${esc(o.summary)}</textarea></div>
         <div class="fld full"><label>Mission</label><textarea data-action="rv-org" data-f="mission" rows="2">${esc(o.mission)}</textarea></div>
         <div class="fld full"><label>Vision</label><input value="${esc(o.vision)}" data-action="rv-org" data-f="vision"></div></div>`)
-      + card('Strategic goals', o.goals.map((g, i) => `<div class="brow"><span class="mono" style="min-width:42px">${esc(g.code)}</span>
+      + card('Strategic goals <span class="small muted" style="font-family:Inter;font-weight:500">· optional</span>', (o.goals.length ? o.goals.map((g, i) => `<div class="brow"><span class="mono" style="min-width:42px">${esc(g.code)}</span>
           <input value="${esc(g.statement)}" data-action="rv-goal" data-i="${i}" style="flex:1;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font:inherit;font-size:12.5px">
-          ${g.basis === 'stated' ? webBadge('Stated') : draftBadge('Proposed')}</div>`).join(''), {style:'margin-top:14px'});
+          ${g.basis === 'stated' ? webBadge('Stated') : g.basis === 'yours' ? impBadge('Yours') : draftBadge('Proposed')}
+          <button class="x btn btn-sm btn-ghost" data-action="rv-goal-del" data-i="${i}" aria-label="Remove goal"><i class="bi bi-trash3"></i></button></div>`).join('')
+          : '<div class="small muted" style="padding:4px 0 8px">No strategic goals — the dashboards work without them. Add your organisation\u2019s goals to see how each programme contributes.</div>')
+          + `<button class="btn btn-sm btn-ghost" data-action="rv-goal-add"><i class="bi bi-plus-lg"></i> Add a goal</button>`, {style:'margin-top:14px'});
   } else {
     const p = ready.find(x => x.key === tab), fw = p.fw, goal = fw.nodes.find(n => n.level === 'goal');
     const lv = l => fw.nodes.filter(n => n.level === l).length;
@@ -1823,7 +1879,7 @@ VIEW_RENDERERS['review'] = () => {
       ${card('Programme', `<div class="form-grid"><div class="fld full"><label>Name</label><input value="${esc(p.name)}" data-action="su-pfield" data-key="${p.key}" data-f="name"></div>
           <div class="fld"><label>Start</label><input type="date" value="${esc(fw.periodStart)}" data-action="rv-fw" data-pk="${p.key}" data-f="periodStart"></div>
           <div class="fld"><label>End</label><input type="date" value="${esc(fw.periodEnd)}" data-action="rv-fw" data-pk="${p.key}" data-f="periodEnd"></div>
-          ${s.addOnly ? '' : `<div class="fld full"><label>Contributes to</label><div class="choice">${s.org.goals.map(g => `<button class="${p.goalCodes.includes(g.code) ? 'on' : ''}" data-action="rv-goal-link" data-key="${p.key}" data-g="${esc(g.code)}">${esc(g.code)} · ${esc(g.statement.slice(0, 48))}${g.statement.length > 48 ? '…' : ''}</button>`).join('')}</div></div>`}</div>
+          ${s.addOnly || !s.org.goals.length ? '' : `<div class="fld full"><label>Contributes to</label><div class="choice">${s.org.goals.map(g => `<button class="${p.goalCodes.includes(g.code) ? 'on' : ''}" data-action="rv-goal-link" data-key="${p.key}" data-g="${esc(g.code)}">${esc(g.code)} · ${esc(g.statement.slice(0, 48))}${g.statement.length > 48 ? '…' : ''}</button>`).join('')}</div></div>`}</div>
         ${fw.warnings.length ? `<ul class="small" style="margin:10px 0 0;padding-left:18px;color:var(--ink-soft)">${fw.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}`, {style:'margin-bottom:14px'})}
       ${goal ? rv_node(p.key, fw, goal) : ''}`;
   }
@@ -1836,6 +1892,9 @@ const rv_p = pk => su_prog(pk);
 ACTIONS['rv-tab'] = t => { su().tab = t.dataset.k; saveState(); redraw(); };
 CHANGES['rv-org'] = t => { su().org[t.dataset.f] = t.value.trim(); saveState(); };
 CHANGES['rv-goal'] = t => { const g = su().org.goals[Number(t.dataset.i)]; if (g){ g.statement = t.value.trim(); saveState(); } };
+ACTIONS['rv-goal-add'] = () => { const o = su().org; o.goals.push({code:nextGoalCode(o.goals), statement:'New strategic goal', basis:'yours'}); saveState(); redraw(); };
+ACTIONS['rv-goal-del'] = t => { const o = su().org, g = o.goals[Number(t.dataset.i)]; if (!g) return; o.goals.splice(Number(t.dataset.i), 1);
+  su().programmes.forEach(p => { p.goalCodes = p.goalCodes.filter(c => c !== g.code); }); saveState(); redraw(); };
 ACTIONS['rv-goal-link'] = t => { const p = su_prog(t.dataset.key); if (!p) return; const g = t.dataset.g;
   p.goalCodes = p.goalCodes.includes(g) ? p.goalCodes.filter(x => x !== g) : p.goalCodes.concat([g]); saveState(); redraw(); };
 CHANGES['rv-fw'] = t => { const p = rv_p(t.dataset.pk); if (!p) return; p.fw[t.dataset.f] = t.value; p.fw.periodAssumed = []; saveState(); };
@@ -1932,7 +1991,35 @@ const moneyIn = (v, cur) => `${cur || 'USD'} ${v >= 1e6 ? r1(v / 1e6) + 'M' : v 
 const srcChip = p => p.source.kind === 'upload' ? impBadge('From your logframe') : p.source.kind === 'drafted' ? draftBadge('AI-drafted') : `<span class="prov imp"><i class="bi bi-journal-text"></i>Sample</span>`;
 const orgSrcLine = () => { const o = appData.org;
   if (isSample()) return `<span class="prov imp"><i class="bi bi-journal-text"></i>Sample organisation (fictional)</span>`;
+  if (o.source.kind === 'logframe') return impBadge(`Built from your logframe${appData.programmes.length === 1 ? '' : 's'}`);
   return o.source.pages.length ? `${webBadge(`Profile from ${o.source.pages.length} page${o.source.pages.length === 1 ? '' : 's'} of your website`)}` : `<span class="prov imp"><i class="bi bi-chat-left-text"></i>Profile from your description</span>`; };
+const goalBadge = g => g.basis === 'stated' ? webBadge('Stated by the organisation') : g.basis === 'yours' ? impBadge('Added by you') : draftBadge('Proposed by AI');
+/* Add or edit a strategic goal and the programmes that serve it. data-i = -1 adds. */
+ACTIONS['st-goal'] = t => {
+  const o = appData.org, i = Number(t.dataset.i), g = o.goals[i] || {code:nextGoalCode(o.goals), statement:''};
+  openModal({title:i < 0 ? 'Add a strategic goal' : `Edit ${g.code}`, body:`<form id="st-goal-form" data-action="st-goal-form" data-i="${i}"><div class="form-grid">
+      <div class="fld"><label for="sg-c">Code</label><input id="sg-c" name="code" value="${esc(g.code)}" required></div>
+      <div class="fld full"><label for="sg-s">Goal</label><textarea id="sg-s" name="statement" rows="2" required placeholder="e.g. Universal access to safe water in the communities we serve">${esc(g.statement)}</textarea></div>
+      <div class="fld full"><label>Programmes that serve it</label>${appData.programmes.map(p => `<label style="display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0;text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink)">
+        <input type="checkbox" name="prog" value="${esc(p.id)}"${p.goalCodes.includes(g.code) ? ' checked' : ''}> ${progDot(p)} ${esc(p.name)}</label>`).join('')}</div></div></form>`,
+    foot:`${i >= 0 ? '<button class="btn btn-danger" data-action="st-goal-del" data-i="' + i + '" style="margin-right:auto">Remove goal</button>' : ''}<button class="btn" data-action="close-modal">Cancel</button><button class="btn btn-primary" type="submit" form="st-goal-form">Save</button>`});
+};
+SUBMITS['st-goal-form'] = (f, fd) => {
+  const o = appData.org, i = Number(f.dataset.i), code = String(fd.get('code') || '').trim(), statement = String(fd.get('statement') || '').trim();
+  if (!code || statement.length < 5){ toast('Give the goal a code and a statement.', 'warn'); return; }
+  if (o.goals.some((g, k) => g.code === code && k !== i)){ toast(`${code} is already used.`, 'warn'); return; }
+  const old = i >= 0 ? o.goals[i] : null, linked = fd.getAll('prog'), was = old ? `${old.code} · ${old.statement}` : null;
+  if (old){ appData.programmes.forEach(p => { p.goalCodes = p.goalCodes.filter(c => c !== old.code); }); Object.assign(old, {code, statement}); }
+  else o.goals.push({code, statement, basis:'yours'});
+  appData.programmes.forEach(p => { if (linked.includes(p.id) && !p.goalCodes.includes(code)) p.goalCodes.push(code); });
+  saveState(); addLog(`${old ? 'edited' : 'added'} strategic goal ${code}`, {view:'strategy', meta:''}, 'bi-bullseye', {old:was, new:`${code} · ${statement} · ${linked.length} programmes`, reason:'Strategy'});
+  closeModal(); redraw(); toast(`${code} saved — linked to ${plural(linked.length, 'programme')}.`, 'ok');
+};
+ACTIONS['st-goal-del'] = t => {
+  const o = appData.org, g = o.goals[Number(t.dataset.i)]; if (!g || !confirm(`Remove ${g.code}? Programmes stay; only the link is removed.`)) return;
+  o.goals.splice(Number(t.dataset.i), 1); appData.programmes.forEach(p => { p.goalCodes = p.goalCodes.filter(c => c !== g.code); });
+  saveState(); addLog(`removed strategic goal ${g.code}`, {view:'strategy', meta:''}, 'bi-trash3', {old:`${g.code} · ${g.statement}`, new:null, reason:'Strategy'}); closeModal(); redraw();
+};
 const sampleBanner = () => isSample()
   ? banner('info', 'bi-journal-text', `You are looking at the <b>sample organisation</b> — fictional. ${go('setup', '', 'Set up your own organisation')}: AI reads your website and builds this for your programmes.`) : '';
 function feedItem(e){
@@ -1987,7 +2074,7 @@ VIEW_RENDERERS['dashboard'] = () => {
   const hero = `<div class="hero">
       <div class="hpill"><i class="bi bi-calendar3"></i> ${esc(lq.label)} · latest completed quarter</div>
       <h2>${esc(o.name)}</h2>
-      <div class="hsub">${esc(o.mission || o.summary)}</div>
+      <div class="hsub">${esc(o.mission || o.summary || `${plural(P.length, 'programme')} — built from your logframes`)}</div>
       <div class="h-score"><b>${pi === null ? '—' : Math.round(pi) + '%'}</b><span>Organisation performance index</span></div>
       <div class="hero-points">${pt(P.length, P.length === 1 ? 'programme' : 'programmes', 'ok', 'portfolio', '')}
         ${pt(c.on, 'indicators on track', 'ok', 'indicators', 'status=on')}${pt(c.off, 'off track', 'bad', 'indicators', 'status=off')}
@@ -1998,13 +2085,15 @@ VIEW_RENDERERS['dashboard'] = () => {
       ${goals.map(g => { const gi = goalIndex(g.code); return `<tr><td><button class="linkish" ${goAttrs('strategy', '')}><b>${esc(g.code)}</b> ${esc(g.statement)}</button></td>
         ${P.map(p => `<td>${p.goalCodes.includes(g.code) ? `<i class="bi bi-circle-fill" style="color:${TONE_VAR[rag3(perfIndex(p.fw.indicators.filter(i => ['goal','outcome'].includes(nodeById(i.node).level))))]}"></i>` : '<span class="muted">·</span>'}</td>`).join('')}
         <td><b style="color:${TONE_VAR[rag3(gi)]}">${gi === null ? '—' : Math.round(gi) + '%'}</b></td></tr>`; }).join('')}</tbody></table></div>
-      <div class="small muted" style="margin-top:6px">Dot colour: the programme’s goal- and outcome-level performance. ${demoBadge()}</div>` : '<div class="small muted">No strategic goals.</div>';
+      <div class="small muted" style="margin-top:6px">Dot colour: the programme’s goal- and outcome-level performance. ${demoBadge()}</div>`
+    : `<p class="small" style="margin:0 0 10px;line-height:1.6">No strategic goals yet. Add your organisation’s goals and link programmes to them to see how each programme contributes to strategy.</p>
+       <button class="btn btn-sm" data-action="st-goal" data-i="-1"><i class="bi bi-plus-lg"></i> Add a strategic goal</button>`;
   return pageHead(`${esc(o.name)} — performance overview`, `${orgSrcLine()} · frameworks: ${P.filter(p => p.source.kind === 'upload').length} from logframes, ${P.filter(p => p.source.kind === 'drafted').length} AI-drafted · progress ${demoBadge('illustrative')}`,
       `<button class="btn btn-sm" data-action="rp-print" data-kind="board"><i class="bi bi-file-earmark-text"></i> Board report</button>`)
     + sampleBanner() + hero
     + `<div class="kpi-row">
         ${kpi({label:'Programmes', value:P.length, sub:`${P.filter(p => p.source.kind === 'upload').length} with your logframe`, view:'portfolio'})}
-        ${kpi({label:'Strategic goals', value:goals.length, sub:`${goals.filter(g => g.basis === 'stated').length} stated · ${goals.filter(g => g.basis !== 'stated').length} proposed`, view:'strategy'})}
+        ${kpi({label:'Strategic goals', value:goals.length || '—', sub:goals.length ? `${goals.filter(g => g.basis !== 'proposed').length} yours or stated · ${goals.filter(g => g.basis === 'proposed').length} proposed` : 'Optional — add them on Strategic goals', view:'strategy'})}
         ${kpi({label:'Indicators tracked', value:I.length, sub:`${I.filter(i => i.target !== null).length} with a target`, view:'indicators', meta:'all=1'})}
         ${kpi({label:'On track', value:c.on, sub:`${c.attention} need attention · ${c.off} off`, tone:'ok', view:'indicators', meta:'all=1&status=on'})}
         ${kpi({label:'People reached', value:num(reach), sub:'Output indicators that count people · illustrative'})}
@@ -2035,7 +2124,7 @@ VIEW_RENDERERS['profile'] = () => {
       <button class="btn btn-sm" data-action="pr-edit"><i class="bi bi-pencil"></i> Edit profile</button></div>`
     + sampleBanner()
     + `<div class="grid-main mb"><div class="stack">
-        ${card('Who we are', `<p style="margin:0 0 12px;line-height:1.65">${esc(o.summary)}</p>${kvTable([
+        ${card('Who we are', `<p style="margin:0 0 12px;line-height:1.65">${o.summary ? esc(o.summary) : `<span class="muted">${o.source.kind === 'logframe' ? 'This organisation was set up from its logframes. Add a summary, mission and vision with <b>Edit profile</b>.' : 'No summary yet.'}</span>`}</p>${kvTable([
           ['Mission', o.mission ? `${esc(o.mission)} ${fromWeb ? webBadge('Website') : ''}` : '<span class="muted">Not found</span>'],
           ['Vision', o.vision ? `${esc(o.vision)} ${fromWeb ? webBadge('Website') : ''}` : '<span class="muted">Not found</span>'],
           ['Values', o.values.length ? o.values.map(esc).join(' · ') : '<span class="muted">—</span>'],
@@ -2043,12 +2132,12 @@ VIEW_RENDERERS['profile'] = () => {
         ${card(`What your website says <span class="small muted" style="font-family:Inter;font-weight:500">· ${plural(o.facts.length, 'fact')}</span>`,
           o.facts.length ? o.facts.map(f => `<div class="fact"><div class="fc">${esc(FACT_LABEL[f.category] || 'Fact')}</div><div style="flex:1">${esc(f.statement)}
             ${f.url ? `<div><a class="src-link" href="${esc(f.url)}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> ${esc(f.url)}</a></div>` : '<div class="small muted">From your description</div>'}</div></div>`).join('')
-          : `<div class="small muted">${isSample() ? 'The sample organisation is fictional and has no website.' : 'No facts were read from a website.'}</div>`)}</div>
+          : `<div class="small muted">${isSample() ? 'The sample organisation is fictional and has no website.' : o.source.kind === 'logframe' ? 'Set up from logframes — no website was read. Run the set-up with your website to add a profile from what you publish.' : 'No facts were read from a website.'}</div>`)}</div>
       <div class="stack">
         ${card('Focus areas', o.focus.length ? `<div class="choice">${o.focus.map(f => `<span class="chip brand" style="font-size:12px;padding:5px 10px">${esc(f)}</span>`).join('')}</div>` : '<div class="small muted">—</div>')}
-        ${card('Strategic goals', o.goals.map(g => `<div class="fact"><div class="fc">${esc(g.code)}</div><div style="flex:1">${esc(g.statement)}<div style="margin-top:3px">${g.basis === 'stated' ? webBadge('Stated') : draftBadge('Proposed by AI')}
+        ${card('Strategic goals', (o.goals.length ? '' : '<div class="small muted">None yet — optional.</div>') + o.goals.map(g => `<div class="fact"><div class="fc">${esc(g.code)}</div><div style="flex:1">${esc(g.statement)}<div style="margin-top:3px">${goalBadge(g)}
             · ${plural(goalProgs(g.code).length, 'programme')}</div></div></div>`).join('') + `<div style="margin-top:8px">${go('strategy', '', 'Open strategic goals')}</div>`)}
-        ${card('How this profile was built', kvTable([['Basis', esc({website:'Your public website', description:'Your description', general_knowledge:'AI general knowledge — verify', mixed:'Website and general knowledge'}[s.basis] || s.basis)],
+        ${card('How this profile was built', kvTable([['Basis', esc({website:'Your public website', description:'Your description', general_knowledge:'AI general knowledge — verify', mixed:'Website and general knowledge', logframe:'Your logframes only'}[s.basis] || s.basis)],
             ['Pages read', s.pages.length ? s.pages.map(p => `<a class="src-link" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title || p.url)}</a>`).join('<br>') : '—'],
             s.siteError ? ['Website', `<span style="color:var(--warn)">${esc(s.siteError)}</span>`] : null,
             ['Model', esc(s.model || '—')], ['Reviewed', esc(s.reviewedAt || '—')]])
@@ -2084,12 +2173,15 @@ VIEW_RENDERERS['strategy'] = () => {
       <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
         <div style="min-width:86px;text-align:center"><div class="m-code">${esc(g.code)}</div><div style="font:700 30px Fraunces,serif;color:${TONE_VAR[rag3(gi)]}">${gi === null ? '—' : Math.round(gi) + '%'}</div><div class="small muted">performance</div></div>
         <div style="flex:1;min-width:240px"><div style="font:600 17px/1.35 Fraunces,serif">${esc(g.statement)}</div>
-          <div style="margin:6px 0 10px">${g.basis === 'stated' ? webBadge('Stated by the organisation') : draftBadge('Proposed by AI')} · ${plural(L.length, 'goal and outcome indicator')} · ${c.on} on track · ${c.attention} attention · ${c.off} off</div>
+          <div style="margin:6px 0 10px">${goalBadge(g)} · ${plural(L.length, 'goal and outcome indicator')} · ${c.on} on track · ${c.attention} attention · ${c.off} off
+            <button class="btn btn-sm btn-ghost" data-action="st-goal" data-i="${o.goals.indexOf(g)}" style="margin-left:6px"><i class="bi bi-pencil"></i> Edit</button></div>
           ${P.length ? P.map(p => { const pl = p.fw.indicators.filter(i => ['goal','outcome'].includes(nodeById(i.node).level));
             return `<div class="alert-item">${progDot(p)}<div style="flex:1"><div class="a-t">${esc(p.name)}</div><div class="a-d">${pl.slice(0, 3).map(i => `${esc(i.code)} ${esc(i.name)} — ${esc(indStatus(i).label.toLowerCase())}`).join(' · ')}</div></div>
               <button class="btn btn-sm btn-ghost" data-action="open-prog" data-prog="${esc(p.id)}" data-view="programme">Open</button></div>`; }).join('')
             : '<div class="small" style="color:var(--warn)"><i class="bi bi-exclamation-triangle"></i> No programme contributes to this goal yet.</div>'}</div></div></div></div>`; };
-  return pageHead('Strategic goals', 'Each goal rolls up from the goal- and outcome-level indicators of the programmes that serve it.', orgSrcLine())
+  if (!o.goals.length) return pageHead('Strategic goals', 'Optional — link programmes to your organisation’s goals to see how each contributes.', `<button class="btn btn-sm btn-primary" data-action="st-goal" data-i="-1"><i class="bi bi-plus-lg"></i> Add a goal</button>`)
+    + card(null, emptyState('bi-bullseye', 'No strategic goals yet', 'Your programmes work without them. Add a goal — for example from your strategic plan — and choose the programmes that serve it.'));
+  return pageHead('Strategic goals', 'Each goal rolls up from the goal- and outcome-level indicators of the programmes that serve it.', `${orgSrcLine()} <button class="btn btn-sm btn-primary" data-action="st-goal" data-i="-1"><i class="bi bi-plus-lg"></i> Add a goal</button>`)
     + sampleBanner()
     + `<div class="grid-main mb"><div>${o.goals.map(goalCard).join('')}</div>
         ${card('Goal performance', `<div class="chart-wrap"><canvas id="st-goals"></canvas></div><div class="small muted">${demoBadge()}</div>`, {bodyStyle:'padding:8px 12px 12px'})}</div>`;
@@ -2420,7 +2512,7 @@ ACTIONS['rp-print'] = t => {
     <div class="kpis"><div><b>${perfIndex() === null ? '—' : Math.round(perfIndex()) + '%'}</b>Performance index</div><div><b>${appData.programmes.length}</b>Programmes</div><div><b>${c.on}</b>Indicators on track</div><div><b>${c.off}</b>Off track</div></div>
     <h2>Programmes</h2><table><thead><tr><th>Programme</th><th>Framework</th><th>Performance</th><th>On track</th><th>Off track</th><th>Budget spent (illustrative)</th></tr></thead><tbody>${appData.programmes.map(q => { const cc = statusCounts(q.fw.indicators);
       return `<tr><td><b>${esc(q.name)}</b></td><td>${q.source.kind === 'upload' ? 'Organisation logframe' : q.source.kind === 'drafted' ? 'AI-drafted proposal' : 'Sample'}</td><td>${progIndex(q) === null ? '—' : Math.round(progIndex(q)) + '%'}</td><td>${cc.on}</td><td>${cc.off}</td><td>${Math.round(q.budget.spent / q.budget.total * 100)}% of ${esc(moneyIn(q.budget.total, q.budget.currency))}</td></tr>`; }).join('')}</tbody></table>
-    <h2>Strategic goals</h2><table><thead><tr><th>Goal</th><th>Programmes</th><th>Performance</th></tr></thead><tbody>${o.goals.map(g => `<tr><td><b>${esc(g.code)}</b> ${esc(g.statement)}${g.basis === 'stated' ? '' : ' <i>(proposed)</i>'}</td><td>${goalProgs(g.code).map(q => esc(q.short)).join(', ') || '—'}</td><td>${goalIndex(g.code) === null ? '—' : Math.round(goalIndex(g.code)) + '%'}</td></tr>`).join('')}</tbody></table>
+    ${o.goals.length ? '' : '<!--'}<h2>Strategic goals</h2><table><thead><tr><th>Goal</th><th>Programmes</th><th>Performance</th></tr></thead><tbody>${o.goals.map(g => `<tr><td><b>${esc(g.code)}</b> ${esc(g.statement)}${g.basis === 'stated' ? '' : ' <i>(proposed)</i>'}</td><td>${goalProgs(g.code).map(q => esc(q.short)).join(', ') || '—'}</td><td>${goalIndex(g.code) === null ? '—' : Math.round(goalIndex(g.code)) + '%'}</td></tr>`).join('')}</tbody></table>${o.goals.length ? '' : '-->'}
     <h2>Off track</h2>${rp_indRows(I.filter(i => indStatus(i).key === 'off'))}`);
 };
 ACTIONS['rp-csv'] = () => {
@@ -2689,7 +2781,15 @@ function selfTest(){
     const R3 = appData.results.filter(r => r.prog === 'P3');
     check('A decreasing indicator falls from baseline', R3.length > 1 && R3[R3.length - 1].value < 40, true);
   } catch(e){ out.push(`FAIL edge: ${e && e.stack}`); }
-  // 4 · Re-keying a reviewed framework keeps every link
+  // 4 · An organisation known only from its logframes: no website, no goals
+  adoptOrganisation(minimalOrg(H, {kind:'logframe', nameGiven:true}), [makeProgramme({name:'Water'}, normaliseFramework(SAMPLE_WASH, 'P1'), {kind:'upload', filename:'a.pdf'}, 0),
+    makeProgramme({name:H}, normaliseFramework(SAMPLE_YOUTH, 'P2'), {kind:'upload', filename:H}, 1)]);
+  renderAll('logframe-only');
+  check('Logframe-only organisation: no goals, every screen draws', [appData.org.goals.length, appData.programmes.length], [0, 2]);
+  appData.setup = {stage:'org', form:{name:'', website:'', country:'', description:''}, uploads:[{key:'u1', filename:H, payload:{kind:'text', chars:200}, error:null}, {key:'u2', filename:'b.pdf', payload:null, error:H}], lfOrg:H, programmes:[]};
+  try { const h = VIEW_RENDERERS['setup'](''); if (BAD.test(h)) out.push('FAIL setup uploads: unescaped markup'); } catch(e){ out.push(`FAIL setup uploads: ${e.message}`); }
+  appData.setup = null;
+  // 5 · Re-keying a reviewed framework keeps every link
   const rk = rekeyFramework(normaliseFramework(SAMPLE_WASH, 'X3'), 'P7');
   check('Re-keyed framework: every indicator points at a node of the same programme', rk.indicators.every(i => i.prog === 'P7' && rk.nodes.some(n => n.id === i.node)) && rk.nodes.every(n => !n.parent || rk.nodes.some(m => m.id === n.parent)), true);
   Object.assign(appData, saved); if (appData.org){ generateResults(); applyBrand(); }
