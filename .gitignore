@@ -1,0 +1,26 @@
+# ── Secrets ─────────────────────────────────────────────
+# The OpenAI key lives only in .env on the server. Never commit it: the ATBU
+# project tracked .env and lived with live keys in its history.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# ── Generated ───────────────────────────────────────────
+*.png
+out/
+storage/
+node_modules/
+
+# ── Editors / OS ────────────────────────────────────────
+.vscode/
+.idea/
+.claude/
+*.swp
+.DS_Store
+Thumbs.db
+*.log
+
+# Test runs
+_e2e_test.html

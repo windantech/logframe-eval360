@@ -1,0 +1,12 @@
+Level,Code,Result statement,Indicator,Unit,Baseline,Baseline year,Target,Target year,Means of verification,Assumptions
+Goal,G,Young people in the two target regions secure decent and sustainable livelihoods,Youth unemployment rate in target regions,%,31,2024,22,2028,National labour force survey,Macroeconomic conditions remain stable
+Outcome,1,Graduates of the programme are in employment or self-employment,Graduates employed or self-employed six months after completion,%,,,65,2028,Tracer study,Employers continue to recruit
+Outcome,1,,Average monthly income of employed graduates,USD,120,2024,190,2028,Tracer study,
+Output,1.1,Market-relevant technical and vocational training delivered,Young people completing accredited training,people,0,2024,6000,2028,Training records,
+Output,1.1,,Share of trainees who are young women,%,,,50,2028,Training records,
+Output,1.2,Work placements and apprenticeships arranged with employers,Apprenticeships completed,apprenticeships,0,2024,1800,2028,Employer agreements; placement logs,Employers provide placements
+Outcome,2,Youth-led micro-enterprises grow and survive,Youth enterprises still trading after two years,%,40,2024,60,2028,Enterprise survey,
+Output,2.1,Start-up grants and business mentoring provided,Enterprises receiving a start-up grant,enterprises,0,2024,900,2028,Grant register,
+Output,2.1,,Mentoring sessions held,sessions,0,2024,,,Mentor logs,Volunteer mentors remain available
+Activity,1.1,,Develop curricula with industry; accredit training centres; enrol and train cohorts,,,,,,,
+Activity,2.1,,Run business-plan competitions; disburse grants; match mentors,,,,,,,

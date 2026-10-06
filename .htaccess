@@ -1,0 +1,11 @@
+# Eval360 logframe demo — web-root protection.
+Options -Indexes
+
+# Never serve dotfiles (.env, .git, .htaccess) or server-side internals.
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+<FilesMatch "^(lib\.php|.*\.md|.*\.sh|.*\.example)$">
+  Require all denied
+</FilesMatch>
+RedirectMatch 404 ^/(.*/)?(\.git|storage|scripts|docs|tests)(/|$)

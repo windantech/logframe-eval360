@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Eval360 · Bring your own logframe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;padding:28px;
+    background:linear-gradient(150deg,#152a47 0%,#27466e 100%);
+    font:400 15px/1.7 'Inter',system-ui,sans-serif;color:#e6efec}
+  .w{width:100%;max-width:780px}
+  .mark{width:50px;height:50px;border-radius:12px;background:#fff;color:#0b2747;
+    display:grid;place-items:center;font:700 14px 'Fraunces',serif;margin-bottom:22px}
+  .kicker{font:600 11px 'Inter',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:10px}
+  h1{font:700 36px/1.15 'Fraunces',serif;margin:0 0 14px;letter-spacing:-.01em}
+  .lede{font-size:16px;color:rgba(255,255,255,.88);max-width:46em;margin:0 0 32px}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  a.card{display:block;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:22px;
+    color:#fff;text-decoration:none;transition:background .15s,transform .15s}
+  a.card:hover{background:rgba(255,255,255,.17);transform:translateY(-2px)}
+  a.card i{font-size:22px;display:block;margin-bottom:11px;color:#9cc6ec}
+  a.card b{display:block;font:700 18px/1.3 'Fraunces',serif;margin-bottom:6px}
+  a.card span{display:block;font-size:13.5px;color:rgba(255,255,255,.8);line-height:1.6}
+  .foot{margin-top:30px;padding-top:18px;border-top:1px solid rgba(255,255,255,.18);font-size:12.5px;color:rgba(255,255,255,.7)}
+  @media (max-width:680px){ .cards{grid-template-columns:1fr} h1{font-size:28px} }
+</style>
+</head>
+<body>
+<main class="w">
+  <div class="mark">E360</div>
+  <div class="kicker">Eval360 · Monitoring, evaluation &amp; learning</div>
+  <h1>Bring your own logframe</h1>
+  <p class="lede">Upload your logical framework — PDF, Word, Excel or text. AI reads it into a structured results framework,
+    you check it, and Eval360 runs on it: dashboard, logframe matrix, indicator tracking, verification and reports.</p>
+  <div class="cards">
+    <a class="card" href="logframe_eval360_demo.html#import">
+      <i class="bi bi-upload"></i><b>Import your logframe</b>
+      <span>Upload a document or paste the text. Nothing goes live until you have reviewed what the AI extracted.</span>
+    </a>
+    <a class="card" href="logframe_eval360_demo.html">
+      <i class="bi bi-journal-text"></i><b>Explore the sample first</b>
+      <span>A fictional water and sanitation programme, already loaded — see every screen before you import your own.</span>
+    </a>
+  </div>
+  <div class="foot">Demonstration environment. Your document is sent to OpenAI for extraction and is not stored on this server; the extracted
+    framework stays in your browser. Progress figures are illustrative, generated to show how Eval360 tracks results.
+    Do not upload documents you are not permitted to share with a third-party AI service.</div>
+</main>
+</body>
+</html>

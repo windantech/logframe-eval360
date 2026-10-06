@@ -1,0 +1,2116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Eval360 · Your Logframe</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. TOKENS. Brand sits in --brand / --brand-deep / --accent so a client's real
+   colours swap in one place (Administration → Settings does it live).
+   Nothing below hardcodes a colour except inside the token block.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#f3f5f7; --card:#ffffff; --muted:#e8ecf0;
+  --ink:#0f1c2a; --ink-soft:#384858; --ink-mute:#677686;
+  --line:#d3dae2; --line-soft:#e4e9ee;
+  --brand:#27466e; --brand-deep:#152a47; --brand-soft:#e4eaf3;   /* Eval360 product palette */
+  --accent:#b4532a; --accent-soft:#f8e7de;                        /* used sparingly: one thing at a time */
+  --ok:#1f7a45; --warn:#b86e0b; --bad:#a32424; --info:#6a4bb8;
+  --ok-soft:#e1f2e7; --warn-soft:#fbeed2; --bad-soft:#f7e2e0; --info-soft:#ece7f8;
+  --radius:10px;
+  --shadow:0 1px 2px rgba(15,28,42,.04),0 0 0 1px rgba(15,28,42,.05);
+  --shadow-lg:0 12px 34px rgba(15,28,42,.13),0 0 0 1px rgba(15,28,42,.06);
+  --sidebar-w:252px;
+  --topbar-h:60px;
+}
+
+/* ═══ 2. BASE ═══════════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:'Fraunces',Georgia,'Times New Roman',serif;margin:0;text-wrap:balance}
+.mono,code{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace}
+a{color:var(--brand)}
+button{font-family:inherit;font-size:inherit}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.tnum{font-variant-numeric:tabular-nums}
+.muted{color:var(--ink-mute)}
+.small{font-size:11.5px}
+
+/* ═══ 3. LAYOUT — fixed sidebar + sticky topbar + content ═════════════════ */
+.app{display:grid;grid-template-columns:var(--sidebar-w) minmax(0,1fr);min-height:100vh}
+.sb{background:var(--brand-deep);color:#e6edf4;display:flex;flex-direction:column;
+  position:fixed;inset:0 auto 0 0;width:var(--sidebar-w);z-index:40}
+.sb-brand{display:flex;gap:10px;align-items:center;padding:15px 16px 13px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sb-mark{width:40px;height:40px;border-radius:9px;flex-shrink:0;background:#fff;color:var(--brand-deep);
+  display:grid;place-items:center;font-family:'Fraunces',serif;font-weight:700;font-size:11.5px;letter-spacing:-.03em}
+.sb-mark.has-logo{padding:3px}
+.sb-mark img{max-width:100%;max-height:100%;display:block;object-fit:contain}
+.sb-brand-name{font-family:'Fraunces',serif;font-size:13.5px;font-weight:600;line-height:1.22}
+.sb-brand-sub{font-size:9.5px;color:rgba(230,237,244,.56);letter-spacing:.06em;text-transform:uppercase;margin-top:3px}
+.sb-scroll{flex:1;overflow-y:auto;padding:8px 0 6px;scrollbar-width:thin}
+.sb-scroll::-webkit-scrollbar{width:6px}
+.sb-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
+.sb-group{padding:11px 16px 4px;font-size:9.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:rgba(230,237,244,.44)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:6px 16px;color:rgba(230,237,244,.84);
+  font-size:12.8px;cursor:pointer;border:0;border-left:3px solid transparent;background:none;width:100%;text-align:left}
+.nav-item i.bi{font-size:14px;width:16px;flex-shrink:0;opacity:.85}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.11);color:#fff;border-left-color:var(--accent);font-weight:600}
+.nav-badge{margin-left:auto;background:rgba(255,255,255,.16);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px}
+.nav-badge.urgent{background:var(--bad)}
+.nav-badge.warn{background:var(--warn)}
+.sb-foot{padding:10px 16px 13px;border-top:1px solid rgba(255,255,255,.1)}
+.checkchip{display:flex;align-items:center;gap:6px;width:100%;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.1);color:rgba(230,237,244,.8);border-radius:7px;padding:6px 9px;
+  font-size:10.5px;cursor:pointer;text-align:left}
+.checkchip:hover{background:rgba(255,255,255,.12)}
+.checkchip i{color:#7fd3a0}
+.sb-powered{font-size:9.5px;color:rgba(230,237,244,.45);margin-top:8px;letter-spacing:.04em}
+
+.tb{position:sticky;top:0;z-index:30;height:var(--topbar-h);background:rgba(243,245,247,.93);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 22px}
+.tb-hamburger{display:none;background:none;border:0;font-size:19px;color:var(--ink);cursor:pointer}
+.tb-titles{min-width:0;flex:1}
+.tb-crumb{font-size:10.5px;color:var(--ink-mute);letter-spacing:.05em;text-transform:uppercase}
+.tb-title{font-family:'Fraunces',serif;font-size:17px;font-weight:600;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-tools{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.tb-search{position:relative}
+.tb-search i{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--ink-mute)}
+.tb-search input{width:200px;padding:6px 10px 6px 27px;border:1px solid var(--line);border-radius:7px;
+  background:var(--card);font-size:12.5px;color:var(--ink)}
+.sel{border:1px solid var(--line);border-radius:7px;background:var(--card);padding:6px 9px;font-size:12.5px;
+  color:var(--ink);cursor:pointer;max-width:230px}
+.sel-wrap{display:flex;align-items:center;gap:6px}
+.sel-lbl{font-size:10.5px;color:var(--ink-mute);white-space:nowrap}
+.bell{position:relative;background:none;border:1px solid var(--line);border-radius:8px;width:34px;height:32px;
+  cursor:pointer;color:var(--ink-soft);display:grid;place-items:center;font-size:15px}
+.bell:hover{background:var(--card)}
+.bell b{position:absolute;top:-6px;right:-6px;background:var(--bad);color:#fff;font-size:9.5px;font-weight:700;
+  min-width:17px;height:17px;border-radius:9px;display:grid;place-items:center;padding:0 4px}
+.who{display:flex;align-items:center;gap:8px;cursor:pointer;background:none;border:0;padding:2px;text-align:left}
+.avatar{width:31px;height:31px;border-radius:50%;flex-shrink:0;background:var(--brand);color:#fff;
+  display:grid;place-items:center;font-size:11.5px;font-weight:700}
+.who-n{font-size:12px;font-weight:600;line-height:1.2;color:var(--ink)}
+.who-r{font-size:10.5px;color:var(--ink-mute);line-height:1.2}
+
+.content{grid-column:2;display:flex;flex-direction:column;min-width:0}
+.demo-strip{background:var(--brand-soft);color:var(--brand);font-size:11.5px;padding:5px 22px;
+  border-bottom:1px solid var(--line-soft);display:flex;gap:7px;align-items:center}
+.demo-strip i{font-size:12px}
+.main{padding:22px;max-width:1440px;width:100%;margin:0 auto;flex:1}
+
+/* ═══ 4. COMPONENTS ════════════════════════════════════════════════════════ */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);min-width:0}
+.card-head{padding:12px 16px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.card-head h3{font-size:14.5px;font-weight:600}
+.card-head .ch-sub{font-size:11.5px;color:var(--ink-mute)}
+.card-body{padding:16px}
+.sec-title{font-family:'Fraunces',serif;font-size:16px;font-weight:600;margin-bottom:3px}
+.sec-sub{font-size:12.5px;color:var(--ink-mute);margin-bottom:14px;max-width:96ch}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.page-head h2{font-size:21px;font-weight:600;line-height:1.25}
+.page-head .ph-sub{font-size:12.5px;color:var(--ink-mute);margin-top:3px;max-width:90ch}
+.page-head .ph-tools{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.stack{display:flex;flex-direction:column;gap:18px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:7px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap;text-decoration:none}
+.btn:hover{background:var(--muted)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn-primary:hover{background:var(--brand-deep)}
+.btn-accent{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-accent:hover{filter:brightness(.94);background:var(--accent)}
+.btn-danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn-danger:hover{filter:brightness(.94);background:var(--bad)}
+.btn-ghost{background:none;border-color:transparent;color:var(--ink-soft)}
+.btn-ghost:hover{background:var(--muted)}
+.btn-sm{padding:4px 9px;font-size:11.5px}
+.linkish{background:none;border:0;padding:0;color:var(--brand);cursor:pointer;font:inherit;text-align:left;
+  text-decoration:none;border-bottom:1px dotted currentColor}
+.linkish:hover{color:var(--brand-deep)}
+
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap;line-height:1.5}
+.chip i{font-size:10px}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.info{background:var(--info-soft);color:var(--info)}
+.chip.grey{background:var(--muted);color:var(--ink-mute)}
+.chip.brand{background:var(--brand-soft);color:var(--brand)}
+.chip.accent{background:var(--accent-soft);color:var(--accent)}
+.chip.solid-bad{background:var(--bad);color:#fff}
+.demo-tag{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--ink-mute);border:1px dashed var(--line);border-radius:5px;padding:1px 6px;white-space:nowrap}
+
+/* KPI tiles — buttons, because every number drills down */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px;
+  box-shadow:var(--shadow);text-align:left;color:inherit;display:block;width:100%;position:relative;font:inherit}
+button.kpi{cursor:pointer}
+button.kpi:hover{border-color:var(--brand);box-shadow:var(--shadow-lg)}
+button.kpi::after{content:'\F285';font-family:'bootstrap-icons';position:absolute;right:11px;top:12px;font-size:10px;color:var(--ink-mute);opacity:0}
+button.kpi:hover::after{opacity:1}
+.kpi .k-lbl{font-size:10.5px;color:var(--ink-mute);letter-spacing:.03em;text-transform:uppercase;line-height:1.3;padding-right:12px}
+.kpi .k-val{font-family:'Fraunces',serif;font-size:25px;font-weight:700;line-height:1.1;margin-top:5px;font-variant-numeric:tabular-nums}
+.kpi .k-sub{font-size:11.5px;color:var(--ink-mute);margin-top:3px;line-height:1.4}
+.kpi.tone-bad{border-left:3px solid var(--bad)} .kpi.tone-warn{border-left:3px solid var(--warn)} .kpi.tone-ok{border-left:3px solid var(--ok)}
+
+.prog{height:6px;border-radius:3px;background:var(--muted);overflow:hidden;margin:6px 0 3px}
+.prog i{display:block;height:100%;border-radius:3px;background:var(--brand)}
+.prog i.ok{background:var(--ok)} .prog i.warn{background:var(--warn)} .prog i.bad{background:var(--bad)}
+.prog.tall{height:9px}
+.dual{position:relative;height:9px;border-radius:5px;background:var(--muted);overflow:visible;margin:5px 0}
+.dual i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--brand)}
+.dual u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);border-radius:1px;text-decoration:none}
+
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.grid-main{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px;align-items:start}
+.mb{margin-bottom:18px}
+.chart-wrap{position:relative;height:250px;padding:6px 10px 10px}
+.chart-wrap.short{height:200px}
+.chart-wrap.tall{height:300px}
+
+/* Tables */
+.tbl-scroll{overflow-x:auto}
+.dt{width:100%;border-collapse:collapse;font-size:12.5px}
+.dt th{text-align:left;padding:9px 11px;background:var(--muted);border-bottom:1px solid var(--line);font-size:9.5px;
+  font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-mute);white-space:nowrap;user-select:none}
+.dt th.sortable{cursor:pointer}
+.dt th.sortable:hover{color:var(--ink)}
+.dt th .si{font-size:9px;margin-left:3px;opacity:.75}
+.dt td{padding:8px 11px;border-bottom:1px solid var(--line-soft);vertical-align:top;line-height:1.45}
+.dt tbody tr:last-child td{border-bottom:none}
+.dt tbody tr.clickable{cursor:pointer}
+.dt tbody tr.clickable:hover td{background:var(--brand-soft)}
+.dt td.n,.dt th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dt td.c,.dt th.c{text-align:center}
+.dt tr.grp td{background:var(--brand-soft);font-weight:600;font-size:11.5px;color:var(--brand)}
+.dt tr.flag td{background:var(--bad-soft)}
+.dt tfoot td{border-top:2px solid var(--line);font-weight:700;background:var(--muted);font-variant-numeric:tabular-nums}
+.dt .sub{display:block;font-size:11px;color:var(--ink-mute);margin-top:1px}
+.dt .code{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);white-space:nowrap}
+.tbl-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 13px;border-top:1px solid var(--line-soft);
+  font-size:11.5px;color:var(--ink-mute);flex-wrap:wrap}
+.pager{display:flex;gap:4px;align-items:center}
+
+.kv{width:100%;border-collapse:collapse;font-size:12.5px}
+.kv td{padding:7px 0;border-bottom:1px solid var(--line-soft);vertical-align:top}
+.kv td:first-child{color:var(--ink-mute);width:40%;padding-right:12px}
+.kv tr:last-child td{border-bottom:none}
+
+/* Filter bar */
+.filterbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:13px}
+.filterbar select,.filterbar input[type=search]{border:1px solid var(--line);border-radius:7px;background:var(--card);
+  padding:6px 9px;font-size:12px;color:var(--ink);font-family:inherit;max-width:220px}
+.filterbar .fb-lbl{font-size:10.5px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-right:2px}
+.filterbar .spacer{flex:1}
+.fpill{border:1px solid var(--line);border-radius:99px;background:var(--card);padding:4px 11px;font-size:11.5px;cursor:pointer;color:var(--ink-soft)}
+.fpill.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.fpill b{font-variant-numeric:tabular-nums;margin-left:3px}
+.active-filter{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent);border-radius:99px;
+  padding:3px 6px 3px 11px;font-size:11.5px;font-weight:600}
+.active-filter button{border:0;background:rgba(0,0,0,.06);color:inherit;border-radius:99px;width:18px;height:18px;cursor:pointer;line-height:1;font-size:12px}
+
+/* Banners */
+.banner{display:flex;gap:10px;align-items:flex-start;border-radius:9px;padding:11px 14px;font-size:12.5px;line-height:1.55;margin-bottom:14px}
+.banner i{font-size:14px;flex-shrink:0;margin-top:1px}
+.banner.info{background:var(--brand-soft);color:var(--brand-deep);border:1px solid var(--line)}
+.banner.warn{background:var(--warn-soft);color:#6f4307;border:1px solid #ecd29a}
+.banner.bad{background:var(--bad-soft);color:#701b1b;border:1px solid #e9b9b4}
+.banner.ok{background:var(--ok-soft);color:#155a32;border:1px solid #b5dcc3}
+.banner .b-act{margin-left:auto;flex-shrink:0;align-self:center}
+
+/* Tabs */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tab{border:0;background:none;padding:9px 14px;font-size:12.8px;font-weight:500;color:var(--ink-mute);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--brand);border-bottom-color:var(--brand);font-weight:600}
+.tab .cnt{font-size:10px;background:var(--muted);border-radius:99px;padding:0 6px;color:var(--ink-mute)}
+.tab .cnt.bad{background:var(--bad);color:#fff}
+
+/* Hero (executive greeting, record headers) */
+.hero{background:linear-gradient(118deg,var(--brand-deep) 0%,var(--brand) 70%);color:#eef3f8;border-radius:var(--radius);
+  padding:20px 24px;margin-bottom:18px;position:relative;overflow:hidden}
+.hero h2{font-size:22px;font-weight:600;color:#fff;margin-bottom:4px}
+.hero .hsub{font-size:13px;color:rgba(238,243,248,.8)}
+.hero .hpill{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.14);border-radius:99px;
+  padding:2px 10px;font-size:11px;font-weight:600;margin-bottom:9px}
+.hero .hmeta{display:flex;flex-wrap:wrap;gap:6px 26px;margin-top:14px;padding-top:13px;border-top:1px solid rgba(255,255,255,.16)}
+.hero .hmeta div{font-size:11px;color:rgba(238,243,248,.62)}
+.hero .hmeta b{display:block;font-size:14.5px;color:#fff;font-weight:600;margin-top:1px;font-variant-numeric:tabular-nums}
+.hero-points{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.hero-pt{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);
+  color:#fff;border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer}
+.hero-pt:hover{background:rgba(255,255,255,.18)}
+.hero-pt b{font-family:'Fraunces',serif;font-size:15px}
+.hero-pt i.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.hero .h-score{position:absolute;right:24px;top:20px;text-align:right}
+.hero .h-score b{font:700 44px/1 'Fraunces',serif;color:#fff;font-variant-numeric:tabular-nums}
+.hero .h-score span{display:block;font-size:11px;color:rgba(238,243,248,.66);margin-top:4px}
+
+/* Strategic objective bars */
+.so-row{display:grid;grid-template-columns:44px minmax(0,1fr) 170px 52px 112px;gap:12px;align-items:center;
+  padding:10px 4px;border-bottom:1px solid var(--line-soft);cursor:pointer;background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left;font:inherit;color:inherit}
+.so-row:hover{background:var(--brand-soft)}
+.so-row:last-child{border-bottom:0}
+.so-code{font:600 11px 'JetBrains Mono',monospace;color:var(--ink-mute)}
+.so-name{font-size:13px;font-weight:600;line-height:1.35}
+.so-name small{display:block;font-weight:400;color:var(--ink-mute);font-size:11px}
+.so-pct{font:700 17px 'Fraunces',serif;text-align:right;font-variant-numeric:tabular-nums}
+
+/* Alerts and feed */
+.alert-grp{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:4px 0 2px;display:flex;align-items:center;gap:6px}
+.alert-item{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px;align-items:flex-start}
+.alert-item:last-child{border-bottom:none}
+.alert-item > i{font-size:14px;flex-shrink:0;margin-top:1px}
+.alert-item .a-t{font-weight:600}
+.alert-item .a-d{color:var(--ink-mute);font-size:11.5px;margin-top:1px}
+.alert-item button{margin-left:auto;flex-shrink:0;align-self:center}
+.feed-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.feed-item:last-child{border-bottom:none}
+.feed-item .f-ic{width:26px;height:26px;border-radius:7px;flex-shrink:0;display:grid;place-items:center;background:var(--muted);font-size:12px;color:var(--ink-soft)}
+.feed-item .f-t{font-variant-numeric:tabular-nums;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-mute);width:64px;flex-shrink:0;padding-top:4px}
+.feed-item .f-d{color:var(--ink-mute);font-size:11px;margin-top:1px}
+
+/* Split bar (status distribution) */
+.split-bar{display:flex;height:30px;border-radius:8px;overflow:hidden;margin:8px 0}
+.split-bar button{display:flex;align-items:center;justify-content:center;font:700 11px/1 'Inter',sans-serif;color:#fff;
+  white-space:nowrap;border:0;cursor:pointer;padding:0 6px;min-width:0;overflow:hidden}
+.split-bar button:hover{filter:brightness(1.1)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+/* Results chain / cycle */
+.chain{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin:4px 0}
+.chain-step{padding:14px 16px;border:1px solid var(--line);border-right:0;background:var(--card);position:relative}
+.chain-step:first-child{border-radius:9px 0 0 9px}
+.chain-step:last-child{border-right:1px solid var(--line);border-radius:0 9px 9px 0}
+.chain-step .cs-l{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.chain-step .cs-v{font:700 24px/1.15 'Fraunces',serif;margin:5px 0 3px;font-variant-numeric:tabular-nums}
+.chain-step .cs-d{font-size:12px;color:var(--ink-soft);line-height:1.5}
+.cycle{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cycle button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--ink)}
+.cycle button:hover{border-color:var(--brand);color:var(--brand)}
+.cycle i.bi-arrow-right{color:var(--ink-mute);font-size:11px}
+
+/* Strategy cascade tree */
+.tree-node{border-bottom:1px solid var(--line-soft)}
+.tree-row{display:flex;align-items:center;gap:10px;padding:9px 12px}
+.tree-row:hover{background:var(--muted)}
+.tree-tw{width:18px;flex-shrink:0;text-align:center;font-size:10px;color:var(--ink-mute);background:none;border:0;cursor:pointer;padding:2px 0}
+.tree-lvl{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-mute);background:var(--muted);padding:1px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0}
+.tree-code{font:500 11px 'JetBrains Mono',monospace;color:var(--ink-mute);flex-shrink:0;min-width:70px}
+.tree-body{flex:1;min-width:0;font-size:12.8px}
+.tree-right{display:flex;gap:9px;align-items:center;flex-shrink:0}
+.tree-kids{margin-left:24px;border-left:1px solid var(--line)}
+
+/* Mini record cards */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.mini{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px;box-shadow:var(--shadow);
+  text-align:left;font:inherit;color:inherit;width:100%;display:block}
+button.mini{cursor:pointer}
+button.mini:hover{border-color:var(--brand)}
+.mini .m-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.mini .m-code{font:500 10.5px 'JetBrains Mono',monospace;color:var(--ink-mute)}
+.mini .m-t{font-size:13px;font-weight:600;line-height:1.35;margin:3px 0 6px}
+.mini .m-big{font:700 22px/1 'Fraunces',serif;font-variant-numeric:tabular-nums}
+.mini .m-rows{margin-top:9px;font-size:11.5px}
+.mini .m-r{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--line-soft)}
+.mini .m-r:last-child{border-bottom:none}
+.mini .m-r span:first-child{color:var(--ink-mute)}
+.mini .m-r span:last-child{font-variant-numeric:tabular-nums;font-weight:500;text-align:right}
+
+/* Health score */
+.health{display:grid;grid-template-columns:130px 1fr;gap:18px;align-items:center}
+.ring{position:relative;width:130px;height:130px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font:700 32px/1 'Fraunces',serif;font-variant-numeric:tabular-nums}
+.ring b small{display:block;font:500 10.5px 'Inter',sans-serif;color:var(--ink-mute);text-align:center;margin-top:4px}
+.hs-row{display:grid;grid-template-columns:150px 1fr 60px;gap:10px;align-items:center;font-size:12px;padding:4px 0}
+.hs-row span:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+
+/* Risk heat map */
+.heat{display:grid;grid-template-columns:70px repeat(3,minmax(0,1fr));gap:4px;font-size:11px}
+.heat .hl{display:flex;align-items:center;justify-content:flex-end;padding-right:6px;color:var(--ink-mute);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
+.heat .hb{text-align:center;color:var(--ink-mute);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding-top:4px}
+.heat button{height:64px;border-radius:7px;border:1px solid transparent;cursor:pointer;font:700 20px 'Fraunces',serif;color:var(--ink)}
+.heat button:hover{border-color:var(--ink)}
+.heat button small{display:block;font:600 9.5px 'Inter',sans-serif;letter-spacing:.06em;text-transform:uppercase;opacity:.8}
+.heat .r-low{background:var(--ok-soft)} .heat .r-moderate{background:#f3f0cf} .heat .r-high{background:var(--warn-soft)} .heat .r-critical{background:var(--bad-soft)}
+
+/* Kanban-ish board (management actions) */
+.board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start}
+.bcol{background:var(--muted);border-radius:9px;padding:9px}
+.bcol-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px}
+.bcol-h span{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-mute)}
+.bcol-h b{font:700 15px 'Fraunces',serif;font-variant-numeric:tabular-nums}
+.bcard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:7px;padding:9px 10px;
+  margin-bottom:7px;font-size:11.5px;cursor:pointer;display:block;width:100%;text-align:left;font-family:inherit;color:inherit}
+.bcard:hover{border-color:var(--brand)}
+.bcard.overdue{border-left-color:var(--bad)} .bcard.progress{border-left-color:var(--warn)} .bcard.done{border-left-color:var(--ok)} .bcard.pending{border-left-color:var(--info)}
+.bcard .bc-id{font:500 10px 'JetBrains Mono',monospace;color:var(--ink-mute)}
+.bcard .bc-t{font-weight:600;margin:2px 0 4px;line-height:1.35}
+.bcard .bc-m{color:var(--ink-mute);font-size:10.5px;line-height:1.4}
+
+/* Checklist (inspection) */
+.check-row{display:grid;grid-template-columns:28px minmax(0,1fr) 170px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.check-row:last-child{border-bottom:none}
+.check-row i{font-size:15px}
+
+/* Timeline (workflow history) */
+.tl{list-style:none;margin:0;padding:0}
+.tl li{position:relative;padding:0 0 13px 22px;font-size:12px;line-height:1.5}
+.tl li::before{content:'';position:absolute;left:5px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--brand)}
+.tl li::after{content:'';position:absolute;left:8.5px;top:15px;bottom:0;width:1px;background:var(--line)}
+.tl li:last-child::after{display:none}
+.tl li .tl-d{font-size:10.5px;color:var(--ink-mute);font-family:'JetBrains Mono',monospace}
+
+/* Workflow stepper */
+.stepper{display:flex;flex-wrap:wrap;margin:4px 0 2px}
+.step{display:flex;align-items:center;gap:8px;flex:1 1 120px;min-width:120px;padding:8px 10px;border:1px solid var(--line);border-right:0;background:var(--card);font-size:11.5px}
+.step:first-child{border-radius:8px 0 0 8px}
+.step:last-child{border-right:1px solid var(--line);border-radius:0 8px 8px 0}
+.step .s-n{width:20px;height:20px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;font-size:10px;font-weight:700;background:var(--muted);color:var(--ink-mute)}
+.step.done{background:var(--ok-soft)} .step.done .s-n{background:var(--ok);color:#fff}
+.step.doing{background:var(--warn-soft)} .step.doing .s-n{background:var(--warn);color:#fff}
+.step.stop{background:var(--bad-soft)} .step.stop .s-n{background:var(--bad);color:#fff}
+
+/* Evidence list */
+.ev{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.ev:last-child{border-bottom:none}
+.ev .ev-ic{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;background:var(--muted);flex-shrink:0;font-size:14px;color:var(--ink-soft)}
+.ev .ev-n{font-weight:500;word-break:break-all}
+.ev .ev-m{font-size:11px;color:var(--ink-mute)}
+
+/* Region schematic */
+.region-map{width:100%;max-width:420px;display:block;margin:0 auto}
+.region-map .rg{cursor:pointer}
+.region-map .rg:hover path{filter:brightness(.94)}
+.region-map text{font-family:'Inter',sans-serif;pointer-events:none}
+
+/* Search */
+.sr-group{margin-bottom:16px}
+.sr-item{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line-soft);cursor:pointer;background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left;font:inherit;color:inherit}
+.sr-item:hover{background:var(--brand-soft)}
+.sr-item mark{background:#fdf0b5;color:inherit;border-radius:2px;padding:0 1px}
+
+/* Forms */
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+.form-grid .full{grid-column:1/-1}
+.fld label{display:block;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-mute);margin-bottom:4px}
+.fld input,.fld select,.fld textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--card);
+  font-family:inherit;font-size:13px;color:var(--ink)}
+.fld textarea{resize:vertical;min-height:70px;line-height:1.5}
+.fld .hint{font-size:11px;color:var(--ink-mute);margin-top:4px;line-height:1.45}
+.fld input[readonly]{background:var(--muted)}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;z-index:80;background:rgba(15,28,42,.48);display:none;align-items:flex-start;justify-content:center;padding:40px 18px;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border-radius:12px;box-shadow:var(--shadow-lg);width:100%;max-width:680px}
+.modal.wide{max-width:1000px}
+.modal-head{padding:15px 19px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.modal-head h3{font-size:15.5px;font-weight:600}
+.modal-body{padding:19px}
+.modal-foot{padding:13px 19px;border-top:1px solid var(--line-soft);display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.modal-x{background:none;border:0;font-size:19px;color:var(--ink-mute);cursor:pointer;line-height:1}
+.modal-x:hover{color:var(--ink)}
+
+/* Toast */
+#toasts{position:fixed;right:18px;bottom:18px;z-index:95;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--ink);color:#f1f5f9;border-radius:8px;padding:10px 14px;font-size:12.5px;box-shadow:var(--shadow-lg);
+  display:flex;align-items:flex-start;gap:8px;max-width:380px;animation:toastIn .22s ease-out}
+.toast i{font-size:13px;flex-shrink:0;margin-top:1px}
+.toast.ok i{color:#7fd3a0} .toast.warn i{color:#f0c070} .toast.bad i{color:#f09a90}
+@keyframes toastIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
+/* Empty */
+.empty{text-align:center;padding:40px 24px;color:var(--ink-soft)}
+.empty i{font-size:28px;color:var(--ink-mute);opacity:.6}
+.empty h4{margin:10px 0 6px;font:700 15px/1.3 'Fraunces',serif;color:var(--ink)}
+.empty p{margin:0 auto;max-width:52ch;font-size:12.5px;line-height:1.6}
+
+/* Notifications */
+.nt{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:13px;align-items:start;background:var(--card);border:1px solid var(--line);
+  border-left-width:3px;border-radius:var(--radius);padding:13px 15px;margin-bottom:9px}
+.nt.now{border-left-color:var(--bad)} .nt.soon{border-left-color:var(--warn)} .nt.fyi{border-left-color:var(--info)}
+.nt-ic{width:36px;height:36px;border-radius:9px;background:var(--muted);display:grid;place-items:center;font-size:15px;color:var(--ink-soft)}
+.nt.now .nt-ic{background:var(--bad-soft);color:var(--bad)} .nt.soon .nt-ic{background:var(--warn-soft);color:var(--warn)}
+.nt-t{font:600 13.5px/1.4 'Inter',sans-serif;margin-bottom:3px}
+.nt-w{font-size:12px;line-height:1.5;color:var(--ink-soft)}
+.nt-r{display:flex;flex-direction:column;align-items:flex-end;gap:7px;white-space:nowrap}
+
+/* Walkthrough */
+.tour-step{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:start;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+.tour-step:last-child{border-bottom:0}
+.tour-n{width:34px;height:34px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font:700 14px 'Fraunces',serif}
+.tour-step h4{font:600 13.5px/1.35 'Inter',sans-serif;margin-bottom:3px}
+.tour-step p{margin:0;font-size:12.5px;color:var(--ink-soft);line-height:1.55}
+.tour-say{margin-top:7px;padding:8px 11px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 7px 7px 0;font-size:12.5px;font-style:italic;color:var(--ink)}
+
+/* Report centre + document */
+.rep-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:13px}
+.rep-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px 16px;display:flex;flex-direction:column;gap:9px}
+.rep-card h4{font:600 13.5px/1.35 'Inter',sans-serif}
+.rep-card p{margin:0;font-size:12px;color:var(--ink-soft);line-height:1.5}
+.rep-card .rc-foot{margin-top:auto;display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.rep-card .rc-ic{width:34px;height:34px;border-radius:9px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-size:15px}
+.doc-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.doc-bar .spacer{flex:1}
+.doc-wrap{background:var(--muted);padding:22px;border-radius:var(--radius);overflow-x:auto}
+.doc{background:#fff;color:#14202c;max-width:860px;margin:0 auto;padding:46px 54px 56px;box-shadow:0 2px 18px rgba(15,28,42,.14);font:13px/1.62 'Inter',sans-serif}
+.doc .d-brand{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--brand);padding-bottom:12px;margin-bottom:20px;gap:20px}
+.doc .d-brand b{font:700 13px 'Fraunces',serif;color:var(--brand)}
+.doc .d-brand span{font-size:10.5px;color:#66727e;display:block}
+.doc h1{font:700 21px/1.3 'Fraunces',serif;margin:0 0 4px}
+.doc .doc-sub{font-size:12px;color:#5d6a77;margin-bottom:6px}
+.doc h2{font:700 14.5px/1.35 'Fraunces',serif;margin:24px 0 8px;padding-bottom:5px;border-bottom:1.5px solid #14202c}
+.doc h3{font:700 12.5px/1.35 'Inter',sans-serif;margin:16px 0 6px}
+.doc p{margin:0 0 10px}
+.doc table{width:100%;border-collapse:collapse;font-size:11.5px;margin:8px 0 14px}
+.doc th,.doc td{border:1px solid #bcc6d0;padding:5px 8px;text-align:left;vertical-align:top}
+.doc th{background:#eef2f6;font-weight:700;font-size:10.5px}
+.doc td.n,.doc th.n{text-align:right;font-variant-numeric:tabular-nums}
+.doc .narr{background:#f4f7fb;border-left:3px solid var(--brand);padding:11px 14px;margin:0 0 11px;border-radius:0 6px 6px 0}
+.doc .narr-tag{font:700 9px/1 'Inter',sans-serif;letter-spacing:.07em;text-transform:uppercase;color:#66727e;margin-bottom:6px;display:block}
+.doc .d-disc{margin-top:26px;padding-top:9px;border-top:1px solid #d5dce3;font-size:10px;color:#6f7b87;display:flex;justify-content:space-between;gap:14px}
+.doc .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0 14px}
+.doc .kpis div{border:1px solid #d5dce3;border-radius:6px;padding:8px 10px}
+.doc .kpis b{display:block;font:700 18px 'Fraunces',serif}
+.doc .kpis span{font-size:10px;color:#66727e;text-transform:uppercase;letter-spacing:.04em}
+.doc .rag{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+/* Settings */
+.swatch{display:flex;gap:10px;align-items:center;margin-bottom:9px}
+.swatch input[type="color"]{width:38px;height:30px;border:1px solid var(--line);border-radius:7px;background:none;padding:2px;cursor:pointer}
+.swatch label{font-size:12.5px;flex:1}
+.swatch code{font:500 11px 'JetBrains Mono',monospace;color:var(--ink-mute)}
+.perm{width:100%;border-collapse:collapse;font-size:12px}
+.perm th,.perm td{padding:8px 10px;border-bottom:1px solid var(--line-soft);text-align:left}
+.perm thead th{font:700 9.5px/1.3 'Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);background:var(--muted);border-bottom:1px solid var(--line)}
+.perm td.c,.perm th.c{text-align:center}
+.perm .yes{color:var(--ok)} .perm .ro{color:var(--info)} .perm .no{color:var(--line)}
+
+/* Provenance badges — public vs synthetic (brief §108–§110) */
+.prov{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  border-radius:5px;padding:1px 6px;white-space:nowrap;line-height:1.6;vertical-align:middle;font-family:'Inter',sans-serif}
+.prov i{font-size:10px}
+.prov.pub{background:var(--ok-soft);color:var(--ok);border:1px solid transparent;cursor:pointer}
+.prov.pub:hover{border-color:var(--ok)}
+.prov.demo{color:var(--ink-mute);border:1px dashed var(--line);background:transparent;cursor:help}
+.prov.calc{color:var(--accent);background:var(--accent-soft);cursor:help}
+.zone{border-radius:var(--radius);padding:14px 16px 4px;margin-bottom:18px}
+.zone.pub{background:linear-gradient(0deg,var(--ok-soft),var(--ok-soft)) padding-box;border:1px solid #b9dcc6}
+.zone.demo{border:1px dashed var(--line);background:var(--card)}
+.zone-h{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap}
+.zone-h h3{font:600 14px 'Fraunces',serif}
+.zone .kpi-row{margin-bottom:12px}
+.quad{position:relative}
+.quad-lbl{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+
+/* ═══ 5. LOGIN ═════════════════════════════════════════════════════════════ */
+.login{position:fixed;inset:0;z-index:100;background:linear-gradient(140deg,var(--brand-deep) 0%,var(--brand) 100%);
+  display:none;align-items:center;justify-content:center;padding:28px;overflow-y:auto}
+.login.open{display:flex}
+.login-box{width:100%;max-width:980px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);background:var(--card);
+  border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,.3);overflow:hidden}
+.login-l{padding:36px 34px;background:var(--bg);display:flex;flex-direction:column}
+.login-l .lm{width:52px;height:52px;border-radius:12px;background:var(--brand-deep);color:#fff;display:grid;place-items:center;
+  font:700 17px 'Fraunces',serif;margin-bottom:22px}
+.login-l h1{font-size:25px;font-weight:600;line-height:1.2;margin-bottom:10px}
+.login-l .ls{font-size:14px;color:var(--ink-soft);line-height:1.6;margin-bottom:24px}
+.login-l .lorg{font-size:11.5px;color:var(--ink-mute);letter-spacing:.05em;text-transform:uppercase;font-weight:600;margin-bottom:6px}
+.login-form .fld{margin-bottom:12px}
+.login-l .lfoot{margin-top:auto;padding-top:22px;font-size:11.5px;color:var(--ink-mute);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.login-l .lfoot b{color:var(--brand)}
+.login-r{padding:30px 30px 26px}
+.login-r h3{font:600 15px 'Fraunces',serif;margin-bottom:4px}
+.login-r .lr-sub{font-size:12px;color:var(--ink-mute);margin-bottom:14px;line-height:1.5}
+.cred-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.cred{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:var(--card);
+  cursor:pointer;text-align:left;font:inherit;color:inherit}
+.cred:hover{border-color:var(--brand);background:var(--brand-soft)}
+.cred .avatar{width:30px;height:30px;font-size:11px}
+.cred b{display:block;font-size:12.5px;line-height:1.25}
+.cred span{display:block;font-size:10.5px;color:var(--ink-mute);line-height:1.3}
+.login-disc{font-size:11px;color:var(--ink-mute);line-height:1.5;margin-top:14px;display:flex;gap:7px}
+
+/* ═══ 6. RESPONSIVE ════════════════════════════════════════════════════════ */
+@media (max-width:1366px){
+  .grid-main{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:1200px){
+  .grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .board{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tb-search input{width:150px}
+  .who-txt{display:none}
+}
+@media (max-width:1100px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .content{grid-column:1}
+  .sb{transform:translateX(-100%);transition:transform .2s ease}
+  .sb.open{transform:none;box-shadow:var(--shadow-lg)}
+  .tb-hamburger{display:block}
+  .tb-search{display:none}
+  #sb-backdrop{position:fixed;inset:0;z-index:35;background:rgba(15,28,42,.4);display:none}
+  #sb-backdrop.open{display:block}
+  .grid-2{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:860px){
+  .main{padding:16px}
+  .sel-lbl{display:none}
+  .grid-3{grid-template-columns:minmax(0,1fr)}
+  .so-row{grid-template-columns:40px minmax(0,1fr) 52px}
+  .so-row .so-bar,.so-row .so-st{display:none}
+  .chain{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .login-box{grid-template-columns:minmax(0,1fr)}
+  .cred-list{grid-template-columns:minmax(0,1fr)}
+  .hero .h-score{position:static;text-align:left;margin-top:12px}
+  .form-grid{grid-template-columns:minmax(0,1fr)}
+  .doc{padding:26px 20px}
+  .health{grid-template-columns:minmax(0,1fr)}
+  .check-row{grid-template-columns:24px minmax(0,1fr)}
+  .check-row > :last-child{grid-column:2}
+  .board{grid-template-columns:minmax(0,1fr)}
+  .nt{grid-template-columns:32px minmax(0,1fr)}
+  .nt-r{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between}
+  .tour-step{grid-template-columns:36px minmax(0,1fr)}
+  .tour-step > :last-child{grid-column:2}
+}
+@media (max-width:560px){
+  .hide-sm{display:none}
+  #ai-pill{display:none}
+  .tb{gap:8px;padding:0 12px}
+  .tb-titles{display:none}
+  .tb-tools{flex:1;justify-content:flex-end}
+  .sel{max-width:170px}
+  .kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kpi .k-val{font-size:21px}
+}
+@media (max-height:780px){ .chart-wrap{height:215px} }
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media print{
+  body{background:#fff}
+  .sb,.tb,.demo-strip,#toasts,#sb-backdrop,.no-print{display:none!important}
+  .app{display:block} .content{grid-column:1} .main{padding:0;max-width:none}
+}
+
+
+/* ═══ LOGFRAME DEMO — import, review, matrix ═══════════════════════════════ */
+.drop{display:block;border:2px dashed var(--line);border-radius:var(--radius);background:var(--card);padding:34px 22px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--brand);background:var(--brand-soft)}
+.drop i{font-size:34px;color:var(--brand);display:block;margin-bottom:8px}
+.drop b{font:600 17px 'Fraunces',serif;display:block;margin-bottom:4px}
+.drop .small{color:var(--ink-mute)}
+.fmt-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:12px}
+.paste{width:100%;min-height:180px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:12.5px/1.55 'JetBrains Mono',monospace;color:var(--ink);background:var(--card);resize:vertical}
+.busy{display:flex;gap:14px;align-items:center;padding:18px;border-radius:var(--radius);background:var(--brand-soft);color:var(--brand-deep)}
+.spin{width:26px;height:26px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--brand);animation:spin 1s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.rv-node{border:1px solid var(--line);border-radius:var(--radius);background:var(--card);margin-bottom:10px;overflow:hidden}
+.rv-node>.rv-h{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--line-soft)}
+.rv-node .rv-lvl{font:700 9.5px 'Inter',sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-mute);white-space:nowrap;padding-top:6px;min-width:64px}
+.rv-node textarea,.rv-ind input,.rv-ind select{width:100%;border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit;font-size:12.5px;color:var(--ink);background:var(--card)}
+.rv-node textarea{min-height:38px;resize:vertical;font-weight:600}
+.rv-kids{padding:8px 12px 2px 26px}
+.rv-ind{display:grid;grid-template-columns:70px minmax(160px,2.2fr) 100px 80px 80px 104px minmax(110px,1fr) 30px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line-soft);font-size:12px}
+.rv-ind:last-child{border-bottom:0}
+.rv-ind.hdr{font:700 9.5px 'Inter',sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-mute);border-bottom:1px solid var(--line-soft)}
+.rv-ind .flag{border-color:var(--warn)!important;background:var(--warn-soft)!important}
+.rv-ind .x{background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:14px}
+.rv-ind .x:hover{color:var(--bad)}
+.lfm{width:100%;border-collapse:collapse;font-size:12px}
+.lfm th{background:var(--brand-deep);color:#fff;text-align:left;padding:8px 10px;font:700 10px 'Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase}
+.lfm td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;line-height:1.5}
+.lfm td.lvl{font:700 9.5px 'Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);width:84px;background:var(--bg)}
+.lfm tr.goal td{background:var(--brand-soft)} .lfm tr.outcome td:not(.lvl){background:#fbfcfe}
+.lfm ul{margin:0;padding-left:16px} .lfm li{margin-bottom:3px}
+.prov.ai{background:var(--accent-soft);color:var(--accent);border:1px solid transparent}
+.prov.imp{background:var(--brand-soft);color:var(--brand);border:1px solid transparent}
+@media (max-width:900px){ .rv-ind{grid-template-columns:1fr 1fr} .rv-ind.hdr{display:none} .rv-ind > :nth-child(2){grid-column:1 / -1} }
+</style>
+</head>
+<body>
+<div id="sb-backdrop" data-action="close-sidebar"></div>
+<div class="app">
+  <aside class="sb" id="sidebar">
+    <div class="sb-brand">
+      <div class="sb-mark" id="sb-mark">E360</div>
+      <div>
+        <div class="sb-brand-name">Eval360<br><span style="font-size:11px;font-weight:500;opacity:.8">Bring your own logframe</span></div>
+        <div class="sb-brand-sub" id="sb-org">Sample programme</div>
+      </div>
+    </div>
+    <nav class="sb-scroll" id="sb-nav" aria-label="Main navigation"></nav>
+    <div class="sb-foot">
+      <button class="checkchip" data-action="go" data-view="quality" id="check-chip">
+        <i class="bi bi-clipboard-check"></i><span id="check-chip-text">Data quality</span>
+      </button>
+      <div class="sb-powered">Powered by Eval360</div>
+    </div>
+  </aside>
+  <div class="content">
+    <header class="tb">
+      <button class="tb-hamburger" data-action="open-sidebar" aria-label="Open navigation"><i class="bi bi-list"></i></button>
+      <div class="tb-titles">
+        <div class="tb-crumb" id="tb-crumb">Overview</div>
+        <div class="tb-title" id="tb-title">Dashboard</div>
+      </div>
+      <div class="tb-tools">
+        <span class="chip grey" id="ai-pill" title="AI import status"><i class="bi bi-stars"></i> AI import</span>
+        <button class="btn btn-sm btn-primary" data-action="go" data-view="import"><i class="bi bi-upload"></i> <span class="hide-sm">Import your logframe</span></button>
+      </div>
+    </header>
+    <div class="demo-strip"><i class="bi bi-info-circle-fill"></i>
+      <span id="demo-strip"><strong>DEMONSTRATION ENVIRONMENT</strong> — The results framework comes from the logframe you import. Progress figures are illustrative, generated to show how Eval360 tracks them.</span></div>
+    <main class="main" id="main"></main>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-root" data-action="modal-backdrop"></div>
+<div id="toasts" aria-live="polite"></div>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   EVAL360 — BRING YOUR OWN LOGFRAME
+   A visitor imports their own logical framework; the server-side AI proxy
+   (api/extract.php) turns it into a structured results framework; the visitor
+   reviews and corrects it; Eval360 then runs on it — dashboard, logframe
+   matrix, indicators, verification workflow, data quality, reports.
+
+   Provenance is the rule that matters:
+     IMPORTED       structure, wording, baselines, targets — the visitor's own
+     AI-EXTRACTED   how each item got in (reviewed by the visitor before use)
+     ILLUSTRATIVE   every progress figure — generated, never presented as real
+
+   Same single-file conventions as the FPC / CIC / KDC / CAAZ demonstrations:
+   no build step, no framework, data-action events, every figure derived.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ═══ 1. CLOCK — the real date: visitors import live programmes ════════════ */
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
+let clockMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+
+/* ═══ 2. SEEDED RANDOM — the same logframe always gives the same figures ═══ */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hashStr(s){ let h = 2166136261; for (const ch of String(s)){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+let rand = mulberry32(1);
+const rint  = (a, b) => a + Math.floor(rand() * (b - a + 1));
+const pick  = arr => arr[Math.floor(rand() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* ═══ 3. FORMATTING ═════════════════════════════════════════════════════════ */
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = (v, d = 0) => v === null || v === undefined || isNaN(v) ? '—'
+  : Number(v).toLocaleString('en-GB', {minimumFractionDigits:d, maximumFractionDigits:d});
+const pct  = (n, d) => d ? Math.round(n / d * 1000) / 10 : 0;
+const r1   = v => Math.round(v * 10) / 10;
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtDate(d){
+  if (!d) return '—';
+  const [y, m, dd] = String(d).slice(0, 10).split('-').map(Number);
+  return `${dd} ${MONTHS[m - 1]} ${y}`;
+}
+/* Date arithmetic in UTC throughout. */
+function addDays(iso, n){ const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function daysBetween(a, b){ return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000); }
+const daysFromToday = iso => daysBetween(TODAY_ISO, iso);
+function nowStamp(){ return `${TODAY_ISO} ${String(Math.floor(clockMinutes / 60)).padStart(2,'0')}:${String(clockMinutes % 60).padStart(2,'0')}`; }
+const slugFile = s => String(s).replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0, 60) || 'logframe';
+const plural = (n, one, many) => `${num(n)} ${n === 1 ? one : (many || one + 's')}`;
+/* Quarters — calendar quarters, labelled "Q3 2026". */
+const quarterOf = iso => { const [y, m] = iso.split('-').map(Number); return {y, q:Math.floor((m - 1) / 3) + 1}; };
+const qStart = (y, q) => `${y}-${String((q - 1) * 3 + 1).padStart(2,'0')}-01`;
+const qEnd = (y, q) => addDays(q === 4 ? `${y + 1}-01-01` : qStart(y, q + 1), -1);
+const qLabel = (y, q) => `Q${q} ${y}`;
+
+/* ═══ 4. STATE — the single source of truth ═════════════════════════════════ */
+const appData = {
+  fw:null,          // the accepted results framework (normalised)
+  source:null,      // {kind:'sample'|'ai'|'mock', filename, model, extractedAt, reviewedAt}
+  draft:null,       // an extraction awaiting review: {fw, source}
+  results:[],       // illustrative quarterly results — regenerated from fw
+  overrides:{},     // workflow states changed in the session, by result id
+  log:[],           // audit trail
+  settings:{tolerance:10},
+  ai:{checked:false, available:false, mock:false, model:'', remaining:null, limits:null}
+};
+const currentUser = {name:'You', title:'Programme team', role:'you'};
+const ROLE_LABEL = {you:'You'};
+const STORE_KEY = 'eval360.logframe.v1';
+
+/* ═══ 5. NAVIGATION ═════════════════════════════════════════════════════════ */
+const NAV = [
+  {group:'Overview', items:[
+    {key:'dashboard',  icon:'bi-speedometer2',      label:'Programme dashboard'},
+    {key:'import',     icon:'bi-upload',            label:'Import logframe'},
+    {key:'review',     icon:'bi-ui-checks',         label:'Review import'}]},
+  {group:'Results framework', items:[
+    {key:'matrix',     icon:'bi-table',             label:'Logframe matrix'},
+    {key:'chain',      icon:'bi-diagram-3',         label:'Results chain'},
+    {key:'indicators', icon:'bi-graph-up',          label:'Indicators'}]},
+  {group:'Monitoring', items:[
+    {key:'submissions',icon:'bi-check2-square',     label:'Data submissions'},
+    {key:'quality',    icon:'bi-clipboard-check',   label:'Data quality'},
+    {key:'activity',   icon:'bi-clock-history',     label:'Audit trail'}]},
+  {group:'Reports', items:[
+    {key:'reports',    icon:'bi-file-earmark-text', label:'Reports & export'}]},
+  {group:'About', items:[
+    {key:'about',      icon:'bi-info-circle',       label:'How this works'}]}
+];
+const DETAIL_VIEWS = {
+  'indicator-detail':{parent:'indicators', title:'Indicator'},
+  'result-detail':   {parent:'chain',      title:'Result'}
+};
+const navItem = key => NAV.flatMap(g => g.items).find(i => i.key === key);
+const navGroup = key => (NAV.find(g => g.items.some(i => i.key === key)) || {}).group || '';
+/* One visitor, full access — the shared UI helpers ask anyway. */
+const access = () => 'full';
+const viewAccess = v => v === 'review' && !appData.draft ? 'none' : 'full';
+const canEdit = () => true;
+
+/* No published-source register in this demo; the shared badge helpers expect one. */
+const PUBLIC = {}, SOURCES = {};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6. SAMPLE LOGFRAME — a fictional programme, in exactly the shape the AI
+   extraction returns (api/lib.php lf_schema), so it travels the same path as
+   an import. It has deliberate gaps (a missing baseline, a missing target, a
+   missing means of verification) so the data-quality screen has work to show.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const SAMPLE_IND = (code, name, unit, baseline, target, o = {}) => Object.assign({
+  code, name, unit, baseline, baseline_year:baseline === null ? null : '2024', target, target_year:target === null ? null : '2027',
+  direction:'increase', frequency:'Quarterly', means_of_verification:'Programme monitoring database', disaggregation:'Sex, district',
+  source_quote:name, confidence:'high', notes:null}, o);
+const SAMPLE_FRAMEWORK = {
+  is_logframe:true, not_logframe_reason:null,
+  title:'Resilient Water, Sanitation and Hygiene Programme',
+  organisation:'Sample Development Agency (fictional)', country:'Fictional — three districts',
+  period_start:'2025-01-01', period_end:'2027-12-31', currency:'USD',
+  summary:'A three-year programme to extend safe water and sanitation to rural households and schools, and to strengthen district water governance.',
+  goal:{code:'G', statement:'Improved health and resilience of rural households in the three target districts', indicators:[
+    SAMPLE_IND('G.1', 'Incidence of diarrhoeal disease among children under five', 'cases per 1,000 children', 182, 120, {direction:'decrease', frequency:'Annual', means_of_verification:'District health information system'}),
+    SAMPLE_IND('G.2', 'Households reporting reduced water-related losses during drought', '%', 22, 60, {frequency:'Annual', means_of_verification:'Household survey'})]},
+  outcomes:[
+    {code:'1', statement:'Rural households use safely managed drinking water', assumptions:['Groundwater yields remain within design levels'], indicators:[
+      SAMPLE_IND('1.1', 'Population using safely managed drinking water', '%', 38, 70, {means_of_verification:'Household survey; water point records'}),
+      SAMPLE_IND('1.2', 'Functional water points', '%', 64, 90)],
+     outputs:[
+      {code:'1.1', statement:'Water points constructed or rehabilitated', assumptions:[], activities:['Hydrogeological surveys','Borehole drilling','Rehabilitation of hand pumps'], indicators:[
+        SAMPLE_IND('1.1.1', 'Water points constructed or rehabilitated', 'water points', 0, 420),
+        SAMPLE_IND('1.1.2', 'People with new or improved access to water', 'people', 0, 126000)]},
+      {code:'1.2', statement:'Water point committees trained and operational', assumptions:['Communities contribute to maintenance funds'], activities:['Committee formation','Training in operation and maintenance','Spare-parts supply chain'], indicators:[
+        SAMPLE_IND('1.2.1', 'Water point committees trained', 'committees', 0, 380),
+        SAMPLE_IND('1.2.2', 'Committee members who are women', '%', null, 50, {confidence:'medium', notes:'Baseline not stated in the document.'})]}]},
+    {code:'2', statement:'Households and schools adopt improved sanitation and hygiene practices', assumptions:['No major cholera outbreak diverts district staff'], indicators:[
+      SAMPLE_IND('2.1', 'Households using at least basic sanitation', '%', 27, 55, {means_of_verification:'Household survey'}),
+      SAMPLE_IND('2.2', 'Open-defecation-free communities certified', 'communities', 0, 240)],
+     outputs:[
+      {code:'2.1', statement:'Community-led total sanitation delivered', assumptions:[], activities:['Triggering sessions','Follow-up visits','ODF verification'], indicators:[
+        SAMPLE_IND('2.1.1', 'Communities triggered', 'communities', 0, 400),
+        SAMPLE_IND('2.1.2', 'Latrines built by households', 'latrines', 0, 18000, {means_of_verification:null, confidence:'medium', notes:'Means of verification not stated.'})]},
+      {code:'2.2', statement:'Schools equipped with WASH facilities', assumptions:[], activities:['School latrine blocks','Handwashing stations','Menstrual hygiene rooms'], indicators:[
+        SAMPLE_IND('2.2.1', 'Schools with basic WASH services', 'schools', 12, 150),
+        SAMPLE_IND('2.2.2', 'Pupils reached with hygiene education', 'pupils', 0, null, {confidence:'low', notes:'Target described as "all pupils in target schools" — no number given.'})]}]},
+    {code:'3', statement:'District water governance strengthened', assumptions:['District budgets for WASH are released on time'], indicators:[
+      SAMPLE_IND('3.1', 'Districts with an approved and budgeted WASH plan', 'districts', 0, 3, {frequency:'Annual'})],
+     outputs:[
+      {code:'3.1', statement:'District WASH monitoring systems in place', assumptions:[], activities:['Water point mapping','Monitoring system roll-out','Quarterly review meetings'], indicators:[
+        SAMPLE_IND('3.1.1', 'Water points mapped in the district monitoring system', '%', 15, 100),
+        SAMPLE_IND('3.1.2', 'Quarterly district WASH review meetings held', 'meetings', 0, 36)]}]}],
+  assumptions:['Security conditions allow access to all target districts', 'Exchange-rate movements stay within budget contingency'],
+  risks:['Drought reduces groundwater yields', 'Delays in procurement of drilling contractors', 'Staff turnover in district water offices'],
+  warnings:['Indicator 1.2.2 has no baseline.', 'Indicator 2.1.2 has no means of verification.', 'Indicator 2.2.2 has no numeric target.']
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. MODEL — normalise an extraction, generate illustrative progress,
+   calculate status, check data quality, persist in this browser.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const LEVELS = {goal:'Goal', outcome:'Outcome', output:'Output', activity:'Activity'};
+const LEVEL_ICON = {goal:'bi-bullseye', outcome:'bi-flag', output:'bi-box-seam', activity:'bi-list-task'};
+
+/* Loose date reading: "2025", "Jan 2025", "2025-03", "31/12/2027" → ISO. */
+function parseLooseDate(s, end){
+  if (!s) return null;
+  s = String(s).trim();
+  let m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return `${m[1]}-${m[2]}-${m[3]}`;
+  if ((m = s.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})$/))) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  if ((m = s.match(/^(\d{4})-(\d{2})$/))) return end ? addDays(Number(m[2]) === 12 ? `${Number(m[1]) + 1}-01-01` : `${m[1]}-${String(Number(m[2]) + 1).padStart(2,'0')}-01`, -1) : `${m[1]}-${m[2]}-01`;
+  const yr = s.match(/(19|20)\d{2}/);
+  if (!yr) return null;
+  const mo = MONTHS.findIndex(x => new RegExp('\\b' + x, 'i').test(s));
+  if (mo >= 0){ const st = `${yr[0]}-${String(mo + 1).padStart(2,'0')}-01`; return end ? addDays(mo === 11 ? `${Number(yr[0]) + 1}-01-01` : `${yr[0]}-${String(mo + 2).padStart(2,'0')}-01`, -1) : st; }
+  return end ? `${yr[0]}-12-31` : `${yr[0]}-01-01`;
+}
+const numOrNull = v => v === null || v === undefined || v === '' || isNaN(Number(v)) ? null : Number(v);
+const str = v => v === null || v === undefined ? '' : String(v).trim();
+
+/* API shape (nested) → app shape (flat nodes + indicators). Tolerant of gaps:
+   whatever the AI returns, the review screen can show it. */
+function normaliseFramework(x){
+  const fw = {title:str(x.title) || 'Imported logframe', organisation:str(x.organisation), country:str(x.country), currency:str(x.currency),
+    summary:str(x.summary), periodStartRaw:str(x.period_start), periodEndRaw:str(x.period_end),
+    nodes:[], indicators:[], assumptions:(x.assumptions || []).map(str).filter(Boolean), risks:(x.risks || []).map(str).filter(Boolean),
+    warnings:(x.warnings || []).map(str).filter(Boolean)};
+  let n = 0, k = 0;
+  const addNode = (level, code, statement, parent, assumptions) => {
+    const node = {id:`N${++n}`, level, code:str(code) || '', statement:str(statement), parent, assumptions:(assumptions || []).map(str).filter(Boolean)};
+    fw.nodes.push(node); return node;
+  };
+  const addInds = (node, list) => (list || []).forEach((i, j) => fw.indicators.push({
+    id:`I${++k}`, node:node.id, code:str(i.code) || `${node.code || node.level}.i${j + 1}`, name:str(i.name), unit:str(i.unit),
+    baseline:numOrNull(i.baseline), baselineYear:str(i.baseline_year), target:numOrNull(i.target), targetYear:str(i.target_year),
+    dir:['increase','decrease','maintain'].includes(i.direction) ? i.direction : 'increase', frequency:str(i.frequency), mov:str(i.means_of_verification),
+    disagg:str(i.disaggregation), quote:str(i.source_quote), confidence:['high','medium','low'].includes(i.confidence) ? i.confidence : 'medium',
+    notes:str(i.notes), prov:'imported'}));
+  const g = x.goal || {};
+  const goal = addNode('goal', g.code || 'G', g.statement || '', null, []);
+  addInds(goal, g.indicators);
+  (x.outcomes || []).forEach((o, i) => {
+    const on = addNode('outcome', o.code || String(i + 1), o.statement, goal.id, o.assumptions);
+    addInds(on, o.indicators);
+    (o.outputs || []).forEach((p, j) => {
+      const pn = addNode('output', p.code || `${on.code}.${j + 1}`, p.statement, on.id, p.assumptions);
+      addInds(pn, p.indicators);
+      (p.activities || []).forEach((a, q) => addNode('activity', `${pn.code}.a${q + 1}`, a, pn.id, []));
+    });
+  });
+  if (!goal.statement){ goal.statement = 'Goal not stated in the document'; fw.warnings.push('No goal statement was found; add one on the review screen.'); }
+  resolvePeriod(fw);
+  return fw;
+}
+/* The programme period, from the document if it says, otherwise inferred and flagged. */
+function resolvePeriod(fw){
+  let start = parseLooseDate(fw.periodStartRaw, false), end = parseLooseDate(fw.periodEndRaw, true);
+  const ty = fw.indicators.map(i => parseInt(i.targetYear, 10)).filter(y => y > 1990 && y < 2100);
+  const by = fw.indicators.map(i => parseInt(i.baselineYear, 10)).filter(y => y > 1990 && y < 2100);
+  fw.periodAssumed = [];
+  if (!end && ty.length){ end = `${Math.max(...ty)}-12-31`; fw.periodAssumed.push('end date taken from the latest target year'); }
+  if (!start && by.length){ start = `${Math.max(...by) + 1}-01-01`; fw.periodAssumed.push('start date taken from the baseline year'); }
+  if (!end && start){ end = addDays(`${Number(start.slice(0, 4)) + 3}-01-01`, -1); fw.periodAssumed.push('three-year duration assumed'); }
+  if (!start && end){ start = `${Number(end.slice(0, 4)) - 2}-01-01`; fw.periodAssumed.push('three-year duration assumed'); }
+  if (!start){ start = qStart(quarterOf(addDays(TODAY_ISO, -540)).y, quarterOf(addDays(TODAY_ISO, -540)).q); end = addDays(`${Number(start.slice(0, 4)) + 3}-01-01`, -1); fw.periodAssumed.push('no dates in the document — an illustrative three-year period is used'); }
+  if (end <= start) end = addDays(`${Number(start.slice(0, 4)) + 3}-01-01`, -1);
+  fw.periodStart = start; fw.periodEnd = end;
+}
+
+/* ── Lookups ─────────────────────────────────────────────────────────────── */
+const nodeById = id => appData.fw.nodes.find(n => n.id === id);
+const indById = id => appData.fw.indicators.find(i => i.id === id);
+const childNodes = (id, fw = appData.fw) => fw.nodes.filter(n => n.parent === id);
+const nodeInds = (id, fw = appData.fw) => fw.indicators.filter(i => i.node === id);
+const resultNodes = (fw = appData.fw) => fw.nodes.filter(n => n.level !== 'activity');
+const nodeLabel = n => `${LEVELS[n.level]}${n.code && n.level !== 'goal' ? ' ' + n.code : ''}`;
+const fmtVal = (ind, v) => v === null || v === undefined ? '—' : ind.unit === '%' ? num(v, v % 1 ? 1 : 0) + '%' : num(v, v % 1 && Math.abs(v) < 100 ? 1 : 0);
+const unitLabel = ind => ind.unit === '%' ? 'percent' : ind.unit || 'units not stated';
+
+/* ═══ 8. ILLUSTRATIVE PROGRESS ══════════════════════════════════════════════
+   Quarterly results from the programme start to the last completed quarter.
+   Seeded by the framework and indicator, so the same logframe always gives the
+   same figures. Never presented as real: every value carries the demo badge. */
+function reportingQuarters(fw){
+  const last = quarterOf(addDays(qStart(quarterOf(TODAY_ISO).y, quarterOf(TODAY_ISO).q), -1));   // last completed quarter
+  let s = quarterOf(fw.periodStart);
+  const Q = [];
+  let y = s.y, q = s.q;
+  while (y < last.y || (y === last.y && q <= last.q)){ Q.push({y, q, id:`${y}-Q${q}`, label:qLabel(y, q), end:qEnd(y, q)}); q++; if (q > 4){ q = 1; y++; } }
+  fw.timelineShifted = false;
+  if (Q.length < 3){
+    // Not started (or just started): show an illustrative six-quarter window so the screens have something to track.
+    fw.timelineShifted = true;
+    const out = []; let yy = last.y, qq = last.q;
+    for (let i = 0; i < 6; i++){ out.unshift({y:yy, q:qq, id:`${yy}-Q${qq}`, label:qLabel(yy, qq), end:qEnd(yy, qq)}); qq--; if (qq < 1){ qq = 4; yy--; } }
+    return out;
+  }
+  return Q.slice(-12);
+}
+/* Baseline used for illustration when the document gives none — flagged everywhere it shows. */
+function effectiveBaseline(ind){
+  if (ind.baseline !== null) return {v:ind.baseline, assumed:false};
+  if (ind.target === null) return {v:null, assumed:false};
+  if (ind.dir === 'decrease') return {v:r1(ind.target * 1.6), assumed:true};
+  if (ind.dir === 'maintain') return {v:ind.target, assumed:true};
+  return {v:ind.unit === '%' ? r1(ind.target * .5) : 0, assumed:true};
+}
+function generateResults(){
+  const fw = appData.fw, Q = reportingQuarters(fw);
+  appData.quarters = Q;
+  const t0 = Q.length && fw.timelineShifted ? qStart(Q[0].y, Q[0].q) : fw.periodStart;
+  const span = Math.max(1, daysBetween(t0, fw.timelineShifted ? addDays(t0, 365 * 3) : fw.periodEnd));
+  const R = [];
+  // Performance band by rank of a hash, not a coin toss: every logframe shows the intended mix
+  // (about 60% on track, 25% needs attention, 15% off track) and the same logframe always the same.
+  const tracked = fw.indicators.filter(i => i.target !== null && effectiveBaseline(i).v !== null)
+    .map(i => ({id:i.id, h:hashStr(fw.title + '#' + i.code + '#' + i.name)})).sort((a, b) => a.h - b.h);
+  const band = {}; tracked.forEach((t, k) => { const f = (k + .5) / tracked.length; band[t.id] = f < .6 ? 'on' : f < .85 ? 'attention' : 'off'; });
+  fw.indicators.forEach(ind => {
+    rand = mulberry32(hashStr(fw.title + '|' + ind.code + '|' + ind.name));
+    const b = effectiveBaseline(ind);
+    if (b.v === null || ind.target === null) return;               // nothing to track against
+    const perf = band[ind.id] === 'on' ? 1.01 + rand() * .14 : band[ind.id] === 'attention' ? 0.925 + rand() * .035 : 0.6 + rand() * .22;
+    const integer = Number.isInteger(ind.target) && Number.isInteger(b.v) && ind.unit !== '%';
+    Q.forEach((q, i) => {
+      const f = clamp(daysBetween(t0, q.end) / span, 0, 1);
+      const expected = ind.dir === 'maintain' ? ind.target : b.v + (ind.target - b.v) * f;
+      let v = ind.dir === 'maintain' ? ind.target * (perf >= .97 ? 1 : perf) + (rand() - .5) * Math.abs(ind.target) * .02
+                                     : b.v + (ind.target - b.v) * f * clamp(perf + (rand() - .5) * .03, .4, 1.25);
+      if (ind.unit === '%') v = clamp(v, 0, 100);
+      v = integer ? Math.max(0, Math.round(v)) : r1(Math.max(0, v));
+      const latest = i === Q.length - 1;
+      const st = !latest ? 'Locked' : (() => { const r = rand(); return r < .72 ? 'Verified' : r < .84 ? 'Submitted' : r < .93 ? 'Under Review' : 'Draft'; })();
+      R.push({id:`R-${ind.id}-${q.id}`, ind:ind.id, quarter:q.id, label:q.label, value:v, expected:integer ? Math.round(expected) : r1(expected),
+        state:appData.overrides[`R-${ind.id}-${q.id}`] || st, evidence:st === 'Draft' ? [] : [`${slugFile(ind.code)}_${q.id}_data.xlsx`], source_type:'ILLUSTRATIVE'});
+    });
+  });
+  appData.results = R;
+}
+const OFFICIAL = ['Verified','Locked'];
+const indResults = ind => appData.results.filter(r => r.ind === ind.id);
+/* Latest official result — unverified figures never reach the dashboard. */
+function latestOfficial(ind){ const L = indResults(ind).filter(r => OFFICIAL.includes(r.state)); return L[L.length - 1] || null; }
+
+/* ═══ 9. STATUS ═════════════════════════════════════════════════════════════ */
+const STATUS = {
+  on:{key:'on', label:'On track', tone:'ok', icon:'bi-check-circle-fill'},
+  attention:{key:'attention', label:'Needs attention', tone:'warn', icon:'bi-exclamation-circle-fill'},
+  off:{key:'off', label:'Off track', tone:'bad', icon:'bi-x-circle-fill'},
+  none:{key:'none', label:'No verified result', tone:'grey', icon:'bi-dash-circle'},
+  notarget:{key:'notarget', label:'Target needed', tone:'grey', icon:'bi-question-circle'}
+};
+const TONE_VAR = {ok:'var(--ok)', warn:'var(--warn)', bad:'var(--bad)', grey:'var(--ink-mute)', info:'var(--info)', brand:'var(--brand)', accent:'var(--accent)'};
+/* Progress made against progress expected by now (direction-aware), with the tolerance band. */
+function indStatus(ind){
+  if (ind.target === null) return STATUS.notarget;
+  const r = latestOfficial(ind); if (!r) return STATUS.none;
+  const b = effectiveBaseline(ind).v;
+  let ratio;
+  if (ind.dir === 'maintain') ratio = 1 - Math.abs(r.value - ind.target) / Math.max(1e-9, Math.abs(ind.target));
+  else { const want = r.expected - b, got = r.value - b; ratio = Math.abs(want) < 1e-9 ? 1 : got / want; }
+  return ratio >= .98 ? STATUS.on : ratio >= 1 - appData.settings.tolerance / 100 ? STATUS.attention : STATUS.off;
+}
+/* Share of the end-of-programme change achieved so far. */
+function indAchievement(ind){
+  const r = latestOfficial(ind), b = effectiveBaseline(ind).v;
+  if (!r || ind.target === null || b === null) return null;
+  if (ind.dir === 'maintain') return clamp(100 - Math.abs(r.value - ind.target) / Math.max(1e-9, Math.abs(ind.target)) * 100, 0, 100);
+  return Math.abs(ind.target - b) < 1e-9 ? 100 : clamp((r.value - b) / (ind.target - b) * 100, 0, 150);
+}
+function statusCounts(list = appData.fw.indicators){
+  const c = {on:0, attention:0, off:0, none:0, notarget:0};
+  list.forEach(i => c[indStatus(i).key]++);
+  return c;
+}
+/* Performance index: on track counts 1, needs attention ½, among indicators that have a verified result. */
+function perfIndex(list = appData.fw.indicators){
+  const c = statusCounts(list), n = c.on + c.attention + c.off;
+  return n ? r1((c.on + c.attention / 2) / n * 100) : null;
+}
+/* A result's own rollup: its indicators and everything below it. */
+function subtreeInds(nodeId){
+  const ids = [nodeId], out = [];
+  for (let i = 0; i < ids.length; i++) childNodes(ids[i]).forEach(c => ids.push(c.id));
+  return appData.fw.indicators.filter(x => ids.includes(x.node));
+}
+
+/* ═══ 10. DATA QUALITY — what the logframe still needs ══════════════════════ */
+function qualityIssues(fw = appData.fw){
+  const I = [], add = (sev, kind, text, ref) => I.push({sev, kind, text, ref});
+  fw.indicators.forEach(i => {
+    const tag = `${i.code} — ${i.name}`;
+    if (!i.name) add('bad', 'Indicator', 'Indicator has no name', i.id);
+    if (i.target === null) add('bad', 'Target', `${tag}: no numeric target — progress cannot be assessed`, i.id);
+    if (i.baseline === null) add('warn', 'Baseline', `${tag}: no baseline${i.target !== null ? ' — an illustrative baseline is assumed' : ''}`, i.id);
+    if (!i.mov) add('warn', 'Means of verification', `${tag}: no means of verification`, i.id);
+    if (!i.unit) add('warn', 'Unit', `${tag}: unit not stated`, i.id);
+    if (!i.frequency) add('info', 'Frequency', `${tag}: reporting frequency not stated`, i.id);
+    if (i.confidence === 'low' && i.prov === 'imported') add('info', 'AI confidence', `${tag}: the AI was unsure about this indicator — check it against the document`, i.id);
+  });
+  resultNodes(fw).forEach(n => { if (!nodeInds(n.id, fw).length) add('warn', 'Coverage', `${nodeLabel(n)} has no indicator — its achievement cannot be measured`, n.id); });
+  (fw.periodAssumed || []).forEach(p => add('info', 'Period', `Programme period: ${p}`, null));
+  return I;
+}
+
+/* ═══ 11. PERSISTENCE — this browser only; nothing is stored on the server ═ */
+function saveState(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({v:1, fw:appData.fw, source:appData.source, draft:appData.draft, overrides:appData.overrides,
+    log:appData.log.filter(e => e.live).slice(0, 200), settings:appData.settings})); } catch(e){ /* private window or storage full — the session still works */ }
+}
+function loadState(){
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (!s || s.v !== 1 || !s.fw || !Array.isArray(s.fw.nodes)) return false;
+    Object.assign(appData, {fw:s.fw, source:s.source, draft:s.draft || null, overrides:s.overrides || {}, log:s.log || [], settings:Object.assign(appData.settings, s.settings || {})});
+    return true;
+  } catch(e){ return false; }
+}
+function clearState(){ try { localStorage.removeItem(STORE_KEY); } catch(e){} }
+
+/* Make a framework the live one. */
+function adoptFramework(fw, source){
+  appData.fw = fw; appData.source = source; appData.overrides = {};
+  generateResults();
+}
+function loadSample(){
+  const fw = normaliseFramework(SAMPLE_FRAMEWORK);
+  adoptFramework(fw, {kind:'sample', filename:'Built-in sample', model:null, extractedAt:null, reviewedAt:null});
+}
+
+/* Event handlers register by data-action name: ACTIONS (click), CHANGES (change), SUBMITS (form submit). */
+const ACTIONS = {}, CHANGES = {}, SUBMITS = {};
+/* ═══════════════════════════════════════════════════════════════════════════
+   18. UI HELPERS — renderers are pure string-builders; these are their parts.
+   ═══════════════════════════════════════════════════════════════════════════ */
+function chip(text, tone = 'grey', icon){
+  return `<span class="chip ${tone}">${icon ? `<i class="bi ${icon}"></i>` : ''}${esc(text)}</span>`;
+}
+const statusChip = st => chip(st.label, st.tone, st.icon);
+const demoTag = (t = 'Demo Data') => `<span class="demo-tag"><i class="bi bi-info-circle"></i>${esc(t)}</span>`;
+/* A drill-down link. meta is either a record id (detail views) or a filter
+   string "key=value&key2=value2" (list views). */
+const go = (view, meta, text, cls = 'linkish') =>
+  `<button class="${cls}" data-action="go" data-view="${esc(view)}" data-meta="${esc(meta || '')}">${text}</button>`;
+const goAttrs = (view, meta) => `data-action="go" data-view="${esc(view)}" data-meta="${esc(meta || '')}"`;
+
+function progressBar(p, tone, tall){
+  const w = Math.max(0, Math.min(100, p || 0));
+  return `<div class="prog${tall ? ' tall' : ''}"><i class="${tone || ''}" style="width:${w}%"></i></div>`;
+}
+/* Bar with a marker — progress against what was expected (planned, budget). */
+function dualBar(value, marker, tone){
+  return `<div class="dual" title="${num(value)}% against ${num(marker)}%"><i style="width:${clamp(value,0,100)}%;background:${TONE_VAR[tone] || 'var(--brand)'}"></i><u style="left:calc(${clamp(marker,0,100)}% - 1px)"></u></div>`;
+}
+function kpi({label, value, sub, tone, view, meta, tag}){
+  const inner = `<div class="k-lbl">${esc(label)}</div>
+    <div class="k-val"${tone && tone !== 'ok' ? ` style="color:${TONE_VAR[tone]}"` : ''}>${value}</div>
+    ${sub ? `<div class="k-sub">${sub}</div>` : ''}${tag ? `<div style="margin-top:6px">${demoTag(tag)}</div>` : ''}`;
+  const cls = `kpi${tone ? ' tone-' + tone : ''}`;
+  return view ? `<button class="${cls}" ${goAttrs(view, meta)} title="Open the records behind this figure">${inner}</button>`
+              : `<div class="${cls}">${inner}</div>`;
+}
+function pageHead(title, sub, tools = ''){
+  return `<div class="page-head"><div><h2>${title}</h2>${sub ? `<div class="ph-sub">${sub}</div>` : ''}</div>
+    ${tools ? `<div class="ph-tools">${tools}</div>` : ''}</div>`;
+}
+function card(title, body, opts = {}){
+  return `<div class="card${opts.cls ? ' ' + opts.cls : ''}"${opts.style ? ` style="${opts.style}"` : ''}>
+    ${title !== null ? `<div class="card-head"><h3>${title}</h3>${opts.right ? `<div class="ch-sub">${opts.right}</div>` : ''}</div>` : ''}
+    ${opts.flush ? body : `<div class="card-body"${opts.bodyStyle ? ` style="${opts.bodyStyle}"` : ''}>${body}</div>`}</div>`;
+}
+const banner = (tone, icon, html, act = '') =>
+  `<div class="banner ${tone}"><i class="bi ${icon}"></i><div>${html}</div>${act ? `<div class="b-act">${act}</div>` : ''}</div>`;
+/* A drill-down only renders as a link when the viewer can open its target. */
+const canOpen = view => viewAccess(view) !== 'none';
+const goIf = (view, meta, text) => canOpen(view) ? go(view, meta, text) : text;
+const viewIf = view => canOpen(view) ? view : null;
+const readOnlyNote = key => access(key) === 'read'
+  ? banner('info', 'bi-eye', `<strong>Read only.</strong> ${esc(ROLE_LABEL[currentUser.role])} can see this screen but not change it.`) : '';
+const emptyState = (icon, title, text) => `<div class="empty"><i class="bi ${icon}"></i><h4>${esc(title)}</h4><p>${text}</p></div>`;
+const kvTable = rows => `<table class="kv"><tbody>${rows.filter(Boolean).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('')}</tbody></table>`;
+
+/* ── Toast and modal ───────────────────────────────────────────────────── */
+function toast(msg, tone = 'ok'){
+  const icons = {ok:'bi-check-circle-fill', warn:'bi-exclamation-triangle-fill', bad:'bi-x-circle-fill'};
+  const el = document.createElement('div');
+  el.className = `toast ${tone}`;
+  el.innerHTML = `<i class="bi ${icons[tone] || icons.ok}"></i><div>${esc(msg)}</div>`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .2s'; setTimeout(() => el.remove(), 200); }, 4200);
+}
+function openModal({title, body, foot = '', wide = false}){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `<div class="modal${wide ? ' wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+      <div class="modal-head"><h3>${esc(title)}</h3>
+        <button class="modal-x" data-action="close-modal" aria-label="Close">&times;</button></div>
+      <div class="modal-body">${body}</div>
+      ${foot ? `<div class="modal-foot">${foot}</div>` : ''}</div>`;
+  root.classList.add('open');
+  const f = root.querySelector('input:not([readonly]),select,textarea');
+  if (f) setTimeout(() => f.focus(), 30);
+}
+function closeModal(){
+  const root = document.getElementById('modal-root');
+  root.classList.remove('open'); root.innerHTML = '';
+}
+
+/* ── Tables: sortable, paged, exportable ────────────────────────────────
+   cols: [{key, label, n (numeric), c (centred), render(r), sv(r) sort value,
+           csv(r) export value, nosort}]
+   opts: {link(r) → [view, meta], pageSize, name, rowClass(r), empty, foot} */
+const TBL = {}, TBL_DATA = {};
+function cmp(a, b){
+  if (a === null || a === undefined) return 1;
+  if (b === null || b === undefined) return -1;
+  return typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'en', {numeric:true});
+}
+function table(id, cols, rows, opts = {}){
+  const st = TBL[id] || (TBL[id] = {sort:opts.sort || null, page:0});
+  let data = rows.slice();
+  if (st.sort){
+    const c = cols.find(x => x.key === st.sort.key);
+    if (c){ const f = c.sv || (r => r[c.key]); data.sort((a, b) => {
+      const x = cmp(f(a), f(b)); return (f(a) === null || f(a) === undefined || f(b) === null || f(b) === undefined) ? x : x * st.sort.dir; }); }
+  }
+  const size = opts.pageSize || 25, pages = Math.max(1, Math.ceil(data.length / size));
+  if (st.page >= pages) st.page = 0;
+  const shown = opts.paginate === false ? data : data.slice(st.page * size, st.page * size + size);
+  TBL_DATA[id] = {cols, rows:data, name:opts.name || id};
+  const th = cols.map(c => {
+    const sorted = st.sort && st.sort.key === c.key;
+    const icon = sorted ? (st.sort.dir > 0 ? 'bi-caret-up-fill' : 'bi-caret-down-fill') : '';
+    return `<th class="${c.n ? 'n ' : ''}${c.c ? 'c ' : ''}${c.nosort ? '' : 'sortable'}"${c.nosort ? '' : ` data-action="tbl-sort" data-tbl="${id}" data-key="${esc(c.key)}"`}
+      ${c.w ? ` style="width:${c.w}"` : ''}>${esc(c.label)}${icon ? `<i class="bi ${icon} si"></i>` : ''}</th>`;
+  }).join('');
+  const body = shown.length ? shown.map(r => {
+    const L = opts.link ? opts.link(r) : null;
+    const rc = opts.rowClass ? opts.rowClass(r) : '';
+    return `<tr class="${L ? 'clickable ' : ''}${rc}"${L ? ' ' + goAttrs(L[0], L[1]) : ''}>${cols.map(c =>
+      `<td class="${c.n ? 'n' : ''}${c.c ? ' c' : ''}">${c.render ? c.render(r) : esc(r[c.key])}</td>`).join('')}</tr>`;
+  }).join('') : `<tr><td colspan="${cols.length}">${emptyState('bi-search', opts.empty || 'No records match', 'Clear a filter to widen the list.')}</td></tr>`;
+  const pager = pages > 1 && opts.paginate !== false ? `<div class="pager">
+      <button class="btn btn-sm btn-ghost" data-action="tbl-page" data-tbl="${id}" data-page="${st.page - 1}" ${st.page === 0 ? 'disabled' : ''} aria-label="Previous page"><i class="bi bi-chevron-left"></i></button>
+      <span>Page ${st.page + 1} of ${pages}</span>
+      <button class="btn btn-sm btn-ghost" data-action="tbl-page" data-tbl="${id}" data-page="${st.page + 1}" ${st.page >= pages - 1 ? 'disabled' : ''} aria-label="Next page"><i class="bi bi-chevron-right"></i></button></div>` : '';
+  const foot = opts.nofoot ? '' : `<div class="tbl-foot"><span>${plural(data.length, opts.noun || 'record')}${opts.foot ? ' · ' + opts.foot : ''}</span>
+      ${pager}<button class="btn btn-sm btn-ghost" data-action="tbl-csv" data-tbl="${id}"><i class="bi bi-filetype-csv"></i> Export CSV</button></div>`;
+  return `<div class="tbl-scroll"><table class="dt"><thead><tr>${th}</tr></thead><tbody>${body}</tbody>
+    ${opts.tfoot ? `<tfoot>${opts.tfoot}</tfoot>` : ''}</table></div>${foot}`;
+}
+function tableCsv(id){
+  const t = TBL_DATA[id]; if (!t) return;
+  const strip = h => String(h ?? '').replace(/<[^>]*>/g, ' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g, ' ').trim();
+  const val = (c, r) => c.csv ? c.csv(r) : c.sv ? c.sv(r) : c.render ? strip(c.render(r)) : r[c.key];
+  const q = v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
+  const lines = [t.cols.map(c => q(c.label)).join(',')].concat(t.rows.map(r => t.cols.map(c => q(val(c, r))).join(',')));
+  downloadBlob(`Eval360_${slugFile(t.name)}_${TODAY_ISO}.csv`, 'text/csv;charset=utf-8', '﻿' + lines.join('\r\n'));
+  toast(`${plural(t.rows.length, 'row')} exported to CSV — opens in Excel. Demonstration data.`, 'ok');
+}
+function downloadBlob(name, mime, content){
+  const blob = new Blob([content], {type:mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+/* ── Filters — state per list view, so a filtered list survives a redraw
+   and a dashboard number can open its list already filtered (brief §60). */
+const FILTERS = {};
+const F = scope => FILTERS[scope] || (FILTERS[scope] = {});
+function parseMeta(meta){
+  const o = {};
+  String(meta || '').split('&').filter(Boolean).forEach(kv => { const [k, ...v] = kv.split('='); o[k] = decodeURIComponent(v.join('=')); });
+  return o;
+}
+function fSelect(scope, key, label, options, allLabel = 'All'){
+  const cur = F(scope)[key] || '';
+  const opts = options.map(o => Array.isArray(o) ? o : [o, o]);
+  return `<select data-action="flt" data-scope="${scope}" data-key="${key}" aria-label="${esc(label)}">
+    <option value="">${esc(label)}: ${esc(allLabel)}</option>
+    ${opts.map(([v, l]) => `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(label)}: ${esc(l)}</option>`).join('')}</select>`;
+}
+function fSearch(scope, placeholder = 'Search'){
+  return `<input type="search" id="q-${scope}" data-action="flt-q" data-scope="${scope}" value="${esc(F(scope).q || '')}" placeholder="${esc(placeholder)}" aria-label="${esc(placeholder)}">`;
+}
+function fPills(scope, key, options){
+  const cur = F(scope)[key] || '';
+  return options.map(([v, l, n]) => `<button class="fpill${String(cur) === String(v) ? ' on' : ''}" data-action="flt-set" data-scope="${scope}" data-key="${key}" data-value="${esc(v)}">${esc(l)}${n !== undefined ? `<b>${num(n)}</b>` : ''}</button>`).join('');
+}
+/* Filters arriving from a drill-down that have no control of their own are
+   shown as removable chips so the user can see why the list is short. */
+function activeFilterChips(scope, labels){
+  const f = F(scope);
+  return Object.entries(labels).filter(([k]) => f[k]).map(([k, l]) =>
+    `<span class="active-filter">${esc(typeof l === 'function' ? l(f[k]) : l)}<button data-action="flt-clear" data-scope="${scope}" data-key="${k}" aria-label="Remove filter">&times;</button></span>`).join('');
+}
+const fClearAll = scope => Object.values(F(scope)).some(v => v)
+  ? `<button class="btn btn-sm btn-ghost" data-action="flt-reset" data-scope="${scope}"><i class="bi bi-x-circle"></i> Clear filters</button>` : '';
+const qMatch = (scope, ...fields) => {
+  const q = (F(scope).q || '').toLowerCase().trim();
+  return !q || fields.some(f => String(f ?? '').toLowerCase().includes(q));
+};
+
+/* ── Tabs ──────────────────────────────────────────────────────────────── */
+const TABS = {};
+function tabs(scope, list, def){
+  const cur = TABS[scope] || def || list[0][0];
+  TABS[scope] = cur;
+  return `<div class="tabs" role="tablist">${list.map(([k, l, cnt, bad]) =>
+    `<button class="tab${k === cur ? ' on' : ''}" role="tab" aria-selected="${k === cur}" data-action="tab" data-scope="${scope}" data-tab="${k}">${l}${cnt !== undefined ? `<span class="cnt${bad ? ' bad' : ''}">${cnt}</span>` : ''}</button>`).join('')}</div>`;
+}
+
+/* ── Evidence ──────────────────────────────────────────────────────────── */
+function evIcon(f){
+  return /\.jpg$/i.test(f) ? 'bi-file-earmark-image' : /\.pdf$/i.test(f) ? 'bi-file-earmark-pdf' : /\.xlsx?$/i.test(f) ? 'bi-file-earmark-spreadsheet' : 'bi-file-earmark';
+}
+function evidenceList(items, emptyText = 'No evidence attached.'){
+  if (!items.length) return `<div class="muted small" style="padding:6px 0"><i class="bi bi-exclamation-triangle" style="color:var(--bad)"></i> ${esc(emptyText)}</div>`;
+  return items.map(e => {
+    const f = typeof e === 'string' ? {file:e} : e;
+    return `<div class="ev"><div class="ev-ic"><i class="bi ${evIcon(f.file)}"></i></div>
+      <div style="flex:1;min-width:0"><div class="ev-n">${esc(f.file)}</div>
+        <div class="ev-m">${[f.kind, f.by, f.date ? fmtDate(f.date) : '', f.size].filter(Boolean).map(esc).join(' · ')}</div></div>
+      <button class="btn btn-sm btn-ghost" data-action="ev-open" data-file="${esc(f.file)}" aria-label="Open ${esc(f.file)}"><i class="bi bi-eye"></i></button></div>`;
+  }).join('');
+}
+
+/* ── Charts — Chart.js 4, colours from the tokens ──────────────────────── */
+const charts = {};
+let pendingMounts = [];
+const afterRender = fn => pendingMounts.push(fn);
+function destroyCharts(){ Object.keys(charts).forEach(k => { try { charts[k].destroy(); } catch(e){} delete charts[k]; }); }
+const CHART_FALLBACK = {'--ink-soft':'#384858','--ink-mute':'#677686','--line-soft':'#e4e9ee','--brand':'#1b3f66','--accent':'#0f7b72',
+  '--ok':'#1f7a45','--warn':'#b86e0b','--bad':'#a32424','--info':'#4c4bb8','--brand-soft':'#e3ebf4','--line':'#d3dae2'};
+function chartTheme(){
+  let cs = null; try { cs = getComputedStyle(document.documentElement); } catch(e){}
+  const t = k => { const v = cs ? String(cs.getPropertyValue(k) || '').trim() : ''; return v || CHART_FALLBACK[k]; };
+  return {ink:t('--ink-soft'), mute:t('--ink-mute'), line:t('--line-soft'), brand:t('--brand'), accent:t('--accent'),
+          ok:t('--ok'), warn:t('--warn'), bad:t('--bad'), info:t('--info'), soft:t('--brand-soft'), grid:t('--line')};
+}
+function chartConfig(cfg){
+  const T = chartTheme();
+  const base = {responsive:true, maintainAspectRatio:false, animation:{duration:300},
+    plugins:{legend:{display:false, labels:{color:T.ink, font:{size:10.5}, boxWidth:10, boxHeight:10}},
+             tooltip:{enabled:true}}};
+  if (cfg.type !== 'radar' && cfg.type !== 'doughnut')
+    base.scales = {x:{grid:{display:false}, ticks:{color:T.mute, font:{size:10}}},
+                   y:{grid:{color:T.line}, ticks:{color:T.mute, font:{size:10}}, beginAtZero:true}};
+  cfg.options = deepMerge(base, cfg.options || {});
+  return cfg;
+}
+function deepMerge(a, b){
+  const out = Array.isArray(a) ? a.slice() : Object.assign({}, a);
+  Object.keys(b).forEach(k => {
+    out[k] = (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) && a[k] && typeof a[k] === 'object') ? deepMerge(a[k], b[k]) : b[k];
+  });
+  return out;
+}
+function mountChart(id, cfg){
+  const el = document.getElementById(id);
+  if (!el || !window.Chart) return;
+  charts[id] = new Chart(el, chartConfig(cfg));
+}
+const pctAxis = (max = 100) => ({min:0, max, ticks:{callback:v => v + '%'}});
+const legendOn = {plugins:{legend:{display:true, position:'bottom'}}};
+
+/* Each screen registers its renderer here: VIEW_RENDERERS[key] = fn(meta) → html. */
+/* ── Data provenance — what came from the visitor's logframe, what the AI read,
+   and what is illustrative are never mixed silently. */
+const DEMO_TIP = 'Illustrative progress, generated to show how Eval360 tracks this indicator. It is not your programme\u2019s actual result.';
+/* Provenance badges for this demo: imported from the visitor's document, or AI-extracted. */
+const impBadge = (t = 'From your logframe') => `<span class="prov imp" title="Taken from the logframe you imported."><i class="bi bi-file-earmark-check"></i>${esc(t)}</span>`;
+const aiBadge = (t = 'AI-extracted · reviewed') => `<span class="prov ai" title="Read from your document by AI, then reviewed by you before use."><i class="bi bi-stars"></i>${esc(t)}</span>`;
+const demoBadge = (t = 'Illustrative Demo Data') => `<span class="prov demo" title="${esc(DEMO_TIP)}"><i class="bi bi-info-circle"></i>${esc(t)}</span>`;
+const calcBadge = (t = 'Calculated') => `<span class="prov calc" title="Calculated by the system from the underlying records."><i class="bi bi-calculator"></i>${esc(t)}</span>`;
+const VIEW_RENDERERS = {};
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   20. IMPORT — read the visitor's file in the browser, send it to the AI
+   proxy, then REVIEW: nothing an AI read goes live until a person accepts it.
+
+   Word and Excel are converted to text here (the host cannot open .docx /
+   .xlsx — no ZipArchive). PDFs go to the AI as files. Converters load from the
+   CDN only when needed.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const API_BASE = 'api/';
+const LIBS = {
+  mammoth:'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js',
+  xlsx:'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+};
+const im_state = {busy:null, error:null, abort:null, paste:''};
+const im_loaded = {};
+function im_loadScript(url){
+  if (im_loaded[url]) return im_loaded[url];
+  return im_loaded[url] = new Promise((res, rej) => { const s = document.createElement('script'); s.src = url; s.onload = res;
+    s.onerror = () => { delete im_loaded[url]; rej(new Error('Could not load the file converter. Check the connection, or save the file as PDF.')); }; document.head.appendChild(s); });
+}
+/* Word HTML → text that keeps table rows together: "cell | cell | cell". */
+function im_htmlToText(html){
+  const doc = new DOMParser().parseFromString(html, 'text/html'), out = [];
+  const walk = el => { for (const c of el.children){
+    if (c.tagName === 'TABLE'){ c.querySelectorAll('tr').forEach(tr => out.push([...tr.children].map(td => td.textContent.replace(/\s+/g, ' ').trim()).join(' | '))); out.push(''); }
+    else if (/^(P|H[1-6]|LI)$/.test(c.tagName)){ const t = c.textContent.replace(/\s+/g, ' ').trim(); if (t) out.push((c.tagName === 'LI' ? '- ' : '') + t); }
+    else walk(c); } };
+  walk(doc.body);
+  return out.join('\n');
+}
+function im_b64(buf){ let s = ''; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); }
+async function im_filePayload(file){
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (ext === 'pdf'){
+    const maxMb = (appData.ai.limits && appData.ai.limits.max_pdf_mb) || 8;
+    if (file.size > maxMb * 1048576) throw new Error(`This PDF is ${r1(file.size / 1048576)} MB; the limit is ${maxMb} MB. Upload only the pages with the logframe.`);
+    return {kind:'pdf', filename:file.name, file_base64:im_b64(await file.arrayBuffer()), chars:null};
+  }
+  let text;
+  const unreadable = kind => new Error(`This ${kind} file could not be read in the browser. Save it as PDF and upload that instead.`);
+  if (ext === 'docx'){ await im_loadScript(LIBS.mammoth);
+    try { text = im_htmlToText((await window.mammoth.convertToHtml({arrayBuffer:await file.arrayBuffer()})).value); } catch(e){ console.warn(e); throw unreadable('Word'); } }
+  else if (['xlsx','xlsm','xls','ods'].includes(ext)){ await im_loadScript(LIBS.xlsx);
+    try { const wb = window.XLSX.read(await file.arrayBuffer(), {type:'array'});
+      text = wb.SheetNames.map(n => `### Sheet: ${n}\n` + window.XLSX.utils.sheet_to_csv(wb.Sheets[n], {blankrows:false})).join('\n\n'); } catch(e){ console.warn(e); throw unreadable('spreadsheet'); } }
+  else if (['csv','tsv','txt','md','json'].includes(ext)) text = await file.text();
+  else if (['doc','ppt','pptx','rtf','odt'].includes(ext)) throw new Error(`.${ext} files cannot be read here. Save the document as PDF or .docx and try again.`);
+  else throw new Error('Unsupported file type. Use PDF, Word (.docx), Excel (.xlsx), CSV or plain text.');
+  text = String(text || '').replace(/\n{3,}/g, '\n\n').trim();
+  if (text.length < 80) throw new Error('Almost no text could be read from this file. If it is a scan, export it as PDF and upload that instead.');
+  return {kind:'text', filename:file.name, text, chars:text.length};
+}
+
+/* ── AI status — asked once; tells the page whether import is switched on ── */
+async function im_checkStatus(){
+  try {
+    const r = await fetch(API_BASE + 'status.php', {cache:'no-store'});
+    const d = await r.json();
+    Object.assign(appData.ai, {checked:true, available:!!d.ai, mock:!!d.mock, model:d.model || '', remaining:d.remaining_today, limits:d.limits || null});
+  } catch(e){ Object.assign(appData.ai, {checked:true, available:false, offline:true}); }
+  updateChrome();
+  if (currentView === 'import') redraw();
+}
+
+/* ── The call ───────────────────────────────────────────────────────────── */
+async function im_run(getPayload, label){
+  if (im_state.busy) return;
+  im_state.error = null; im_state.busy = {label, step:'Reading the document', started:Date.now()}; redraw();
+  try {
+    const payload = await getPayload();
+    im_state.busy.step = payload.kind === 'pdf' ? 'The AI is reading the PDF and structuring the logframe' : `The AI is structuring ${num(payload.chars)} characters of text`;
+    redraw();
+    const ctl = new AbortController(); im_state.abort = ctl;
+    const resp = await fetch(API_BASE + 'extract.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload), signal:ctl.signal});
+    let d; try { d = await resp.json(); } catch(e){ throw new Error(`The server returned an unexpected response (${resp.status}). AI import needs the hosted demo with PHP.`); }
+    if (!d.ok) throw new Error(d.error || 'The import failed.');
+    if (d.meta && d.meta.remaining_today !== undefined) appData.ai.remaining = d.meta.remaining_today;
+    const x = d.framework;
+    if (!x.is_logframe) throw new Error(`This does not look like a results framework: ${x.not_logframe_reason || 'no goal, outcomes or indicators were found'}.`);
+    const fw = normaliseFramework(x);
+    if (!fw.indicators.length && fw.nodes.length < 2) throw new Error('No results or indicators could be read from this document.');
+    appData.draft = {fw, source:{kind:d.meta.model === 'mock' ? 'mock' : 'ai', filename:d.meta.filename || label, model:d.meta.model, extractedAt:d.meta.extracted_at, reviewedAt:null}};
+    im_state.busy = null; saveState();
+    addLog(`imported "${label}" — AI extracted ${plural(fw.indicators.length, 'indicator')}, awaiting review`, {view:'review', meta:''}, 'bi-stars');
+    showView('review');
+    toast(`Read ${plural(fw.nodes.filter(n => n.level === 'outcome').length, 'outcome')} and ${plural(fw.indicators.length, 'indicator')}. Review them before they go live.`, 'ok');
+  } catch(e){
+    im_state.busy = null;
+    im_state.error = e.name === 'AbortError' ? 'Import cancelled.' : (e instanceof TypeError ? 'Could not reach the AI service. AI import works on the hosted demo, not from a file opened on your computer.' : e.message);
+    redraw();
+  } finally { im_state.abort = null; }
+}
+
+/* ═══ Import screen ═════════════════════════════════════════════════════════ */
+VIEW_RENDERERS['import'] = () => {
+  const ai = appData.ai;
+  const status = !ai.checked ? chip('Checking AI service…','grey','bi-hourglass')
+    : ai.available ? chip(ai.mock ? 'AI import on — mock mode' : 'AI import on', 'ok', 'bi-stars')
+    : chip(ai.offline ? 'AI import needs the hosted demo' : 'AI import not configured', 'warn', 'bi-exclamation-triangle');
+  const busy = im_state.busy;
+  return pageHead('Import your logframe', 'Upload a logical framework or results framework. AI reads it into a structured framework; you check it; Eval360 runs on it.', status)
+    + (im_state.error ? banner('bad', 'bi-exclamation-octagon', esc(im_state.error)) : '')
+    + (busy ? `<div class="busy mb"><div class="spin"></div><div style="flex:1"><b>${esc(busy.label)}</b><div class="small">${esc(busy.step)} — usually 20 to 90 seconds.</div></div>
+        <button class="btn btn-sm" data-action="im-cancel">Cancel</button></div>` : '')
+    + `<div class="grid-main mb"><div>
+        <label class="drop" id="im-drop" for="im-file" data-action="im-drop-zone">
+          <i class="bi bi-cloud-arrow-up"></i><b>Drop your logframe here, or choose a file</b>
+          <span class="small">PDF, Word (.docx), Excel (.xlsx), CSV or text${ai.limits ? ` · PDFs up to ${ai.limits.max_pdf_mb} MB` : ''}</span>
+          <div class="fmt-row">${['PDF','DOCX','XLSX','CSV','TXT'].map(f => chip(f, 'grey')).join('')}</div>
+        </label>
+        <input type="file" id="im-file" data-action="im-file" accept=".pdf,.docx,.xlsx,.xlsm,.xls,.ods,.csv,.tsv,.txt,.md" style="display:none" ${busy || !ai.available ? 'disabled' : ''}>
+        <div class="card" style="margin-top:14px"><div class="card-body">
+          <div class="sec-title" style="font-size:14px;margin-bottom:6px">…or paste the logframe text</div>
+          <textarea class="paste" id="im-paste" data-action="im-paste-input" placeholder="Paste the logframe table or results framework here — goal, outcomes, outputs, indicators, baselines, targets.">${esc(im_state.paste)}</textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+            <button class="btn btn-primary" data-action="im-paste-go" ${busy || !ai.available ? 'disabled' : ''}><i class="bi bi-stars"></i> Read with AI</button></div>
+        </div></div></div>
+      <div class="stack">
+        ${card('What happens', `<ol class="small" style="margin:0;padding-left:18px;line-height:1.75">
+            <li><b>Read.</b> Word and Excel files are converted to text in your browser; PDFs are sent as they are.</li>
+            <li><b>Extract.</b> AI (${esc(ai.model || 'OpenAI')}) returns the goal, outcomes, outputs, indicators, baselines, targets, means of verification and assumptions — in your document’s own words. It does not invent numbers: anything missing stays empty and is flagged.</li>
+            <li><b>Review.</b> You check and correct everything before it is used.</li>
+            <li><b>Run.</b> Eval360 builds the dashboard, logframe matrix, indicator tracking, verification workflow and reports on your framework.</li></ol>`)}
+        ${card('Your data', `<p class="small" style="margin:0 0 8px;line-height:1.6">Your document is sent to OpenAI for extraction and is not stored on this server. The extracted framework is kept only in this browser — clear it at any time from <b>How this works</b>.</p>
+            <p class="small muted" style="margin:0;line-height:1.6">Progress figures shown after import are <b>illustrative</b>, generated to demonstrate tracking. Do not upload documents you are not permitted to share with a third-party AI service.</p>
+            ${ai.remaining !== null && ai.remaining !== undefined && ai.available ? `<div style="margin-top:10px">${chip(`${plural(ai.remaining, 'import')} left today`, ai.remaining ? 'brand' : 'warn')}</div>` : ''}`)}
+        ${card('No logframe to hand?', `<p class="small" style="margin:0 0 10px">Explore with the built-in sample — a fictional water and sanitation programme.</p>
+            <button class="btn btn-sm" data-action="im-sample"><i class="bi bi-journal-text"></i> Load the sample logframe</button>
+            <a class="btn btn-sm btn-ghost" href="samples/sample_logframe.csv" download><i class="bi bi-download"></i> Sample file to try the import</a>`)}
+      </div></div>`;
+};
+CHANGES['im-file'] = t => { const f = t.files && t.files[0]; t.value = ''; if (f) im_run(() => im_filePayload(f), f.name); };
+CHANGES['im-paste-input'] = t => { im_state.paste = t.value; };
+ACTIONS['im-paste-go'] = () => {
+  const el = document.getElementById('im-paste'); const text = (el ? el.value : im_state.paste).trim(); im_state.paste = text;
+  if (text.length < 80){ toast('Paste the whole logframe — at least a few lines of text.', 'warn'); return; }
+  im_run(async () => ({kind:'text', filename:'Pasted text', text, chars:text.length}), 'Pasted text');
+};
+ACTIONS['im-cancel'] = () => { if (im_state.abort) im_state.abort.abort(); };
+ACTIONS['im-sample'] = () => {
+  const before = appData.fw ? appData.fw.title : '—';
+  loadSample(); appData.draft = null; saveState();
+  addLog('loaded the built-in sample logframe', {view:'dashboard', meta:''}, 'bi-journal-text', {old:before, new:appData.fw.title, reason:'Sample selected'});
+  showView('dashboard'); toast('Sample logframe loaded.', 'ok');
+};
+ACTIONS['im-drop-zone'] = () => {};
+/* Drag and drop onto the drop zone. */
+document.addEventListener('dragover', e => { const z = e.target.closest && e.target.closest('#im-drop'); if (z){ e.preventDefault(); z.classList.add('over'); } });
+document.addEventListener('dragleave', e => { const z = e.target.closest && e.target.closest('#im-drop'); if (z) z.classList.remove('over'); });
+document.addEventListener('drop', e => {
+  const z = e.target.closest && e.target.closest('#im-drop'); if (!z) return;
+  e.preventDefault(); z.classList.remove('over');
+  if (!appData.ai.available){ toast('AI import is not available here — try the sample logframe.', 'warn'); return; }
+  const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) im_run(() => im_filePayload(f), f.name);
+});
+
+/* ═══ Review screen — correct the extraction before it goes live ═══════════ */
+const RV_CONF = {high:'ok', medium:'warn', low:'bad'};
+function rv_indRow(i){
+  const f = (k, v, cls = '', type = 'text', ph = '') => `<input type="${type}" ${type === 'number' ? 'step="any"' : ''} class="${cls}" value="${esc(v ?? '')}" placeholder="${esc(ph)}"
+    data-action="rv-ind" data-id="${i.id}" data-f="${k}" aria-label="${esc(k)}">`;
+  return `<div class="rv-ind">
+    ${f('code', i.code, '', 'text', 'Code')}
+    <div>${f('name', i.name, i.name ? '' : 'flag', 'text', 'Indicator')}${i.quote ? `<div class="small muted" style="margin-top:2px" title="${esc(i.quote)}"><i class="bi bi-quote"></i> ${esc(i.quote.slice(0, 90))}${i.quote.length > 90 ? '…' : ''}</div>` : ''}</div>
+    ${f('unit', i.unit, i.unit ? '' : 'flag', 'text', 'Unit')}
+    ${f('baseline', i.baseline, i.baseline === null ? 'flag' : '', 'number', 'none')}
+    ${f('target', i.target, i.target === null ? 'flag' : '', 'number', 'none')}
+    <select data-action="rv-ind" data-id="${i.id}" data-f="dir" aria-label="Direction">${['increase','decrease','maintain'].map(d => `<option value="${d}"${i.dir === d ? ' selected' : ''}>${d === 'increase' ? '↑' : d === 'decrease' ? '↓' : '='} ${d}</option>`).join('')}</select>
+    ${f('mov', i.mov, i.mov ? '' : 'flag', 'text', 'Means of verification')}
+    <button class="x" data-action="rv-del-ind" data-id="${i.id}" title="Remove indicator" aria-label="Remove indicator"><i class="bi bi-trash3"></i></button>
+  </div>${i.notes || i.confidence !== 'high' ? `<div class="small" style="margin:-2px 0 6px 76px;color:var(--ink-mute)">${chip('AI confidence: ' + i.confidence, RV_CONF[i.confidence])} ${esc(i.notes)}</div>` : ''}`;
+}
+function rv_node(fw, n){
+  const inds = nodeInds(n.id, fw), kids = childNodes(n.id, fw), acts = kids.filter(k => k.level === 'activity');
+  return `<div class="rv-node"><div class="rv-h"><div class="rv-lvl"><i class="bi ${LEVEL_ICON[n.level]}"></i> ${esc(LEVELS[n.level])}<br><input value="${esc(n.code)}" data-action="rv-node" data-id="${n.id}" data-f="code" style="width:58px;margin-top:4px;border:1px solid var(--line);border-radius:5px;padding:2px 5px;font:11px 'JetBrains Mono',monospace" aria-label="Code"></div>
+      <textarea data-action="rv-node" data-id="${n.id}" data-f="statement" aria-label="Statement">${esc(n.statement)}</textarea>
+      ${n.level !== 'goal' ? `<button class="x btn btn-sm btn-ghost" data-action="rv-del-node" data-id="${n.id}" title="Remove this ${esc(LEVELS[n.level].toLowerCase())} and everything under it"><i class="bi bi-trash3"></i></button>` : ''}</div>
+    <div class="rv-kids">
+      ${inds.length ? `<div class="rv-ind hdr"><span>Code</span><span>Indicator</span><span>Unit</span><span>Baseline</span><span>Target</span><span>Direction</span><span>Verification</span><span></span></div>${inds.map(rv_indRow).join('')}`
+        : `<div class="small" style="color:var(--warn);padding:4px 0"><i class="bi bi-exclamation-triangle"></i> No indicator for this result.</div>`}
+      <div style="padding:6px 0 8px"><button class="btn btn-sm btn-ghost" data-action="rv-add-ind" data-id="${n.id}"><i class="bi bi-plus-lg"></i> Add indicator</button>
+        ${acts.length ? `<span class="small muted" style="margin-left:8px">Activities: ${acts.map(a => esc(a.statement)).join(' · ')}</span>` : ''}</div>
+      ${kids.filter(k => k.level !== 'activity').map(k => rv_node(fw, k)).join('')}
+    </div></div>`;
+}
+VIEW_RENDERERS['review'] = () => {
+  const d = appData.draft;
+  if (!d) return pageHead('Review import', '') + card(null, emptyState('bi-ui-checks', 'Nothing to review', 'Import a logframe first.'));
+  const fw = d.fw, Q = qualityIssues(fw), lv = l => fw.nodes.filter(n => n.level === l).length;
+  const goal = fw.nodes.find(n => n.level === 'goal');
+  return pageHead('Review the extraction', `From <b>${esc(d.source.filename)}</b> · read by ${esc(d.source.model || 'AI')} ${aiBadge('AI-extracted · not yet reviewed')}`,
+      `<button class="btn btn-sm" data-action="rv-discard"><i class="bi bi-x-lg"></i> Discard</button> <button class="btn btn-sm btn-primary" data-action="rv-accept"><i class="bi bi-check2-circle"></i> Accept and load</button>`)
+    + banner('info', 'bi-person-check', 'Check every statement and number against your document. Fields highlighted in amber were missing or uncertain. Nothing goes live until you accept it.')
+    + `<div class="kpi-row">${kpi({label:'Outcomes', value:lv('outcome')})}${kpi({label:'Outputs', value:lv('output')})}${kpi({label:'Activities', value:lv('activity')})}
+        ${kpi({label:'Indicators', value:fw.indicators.length})}${kpi({label:'Without a target', value:fw.indicators.filter(i => i.target === null).length, tone:'warn'})}
+        ${kpi({label:'Without a baseline', value:fw.indicators.filter(i => i.baseline === null).length, tone:'warn'})}</div>`
+    + `<div class="grid-main mb">${card('Programme', `<div class="form-grid">
+          <div class="fld full"><label>Title</label><input value="${esc(fw.title)}" data-action="rv-fw" data-f="title"></div>
+          <div class="fld"><label>Organisation</label><input value="${esc(fw.organisation)}" data-action="rv-fw" data-f="organisation"></div>
+          <div class="fld"><label>Country / location</label><input value="${esc(fw.country)}" data-action="rv-fw" data-f="country"></div>
+          <div class="fld"><label>Start</label><input type="date" value="${esc(fw.periodStart)}" data-action="rv-fw" data-f="periodStart"></div>
+          <div class="fld"><label>End</label><input type="date" value="${esc(fw.periodEnd)}" data-action="rv-fw" data-f="periodEnd"></div></div>
+          ${fw.periodAssumed.length ? `<div class="small" style="color:var(--warn);margin-top:6px"><i class="bi bi-info-circle"></i> Period: ${esc(fw.periodAssumed.join('; '))}.</div>` : ''}
+          ${fw.summary ? `<p class="small muted" style="margin:10px 0 0">${esc(fw.summary)}</p>` : ''}`)}
+        ${card('What the AI flagged', (fw.warnings.length ? `<ul class="small" style="margin:0 0 8px;padding-left:18px;line-height:1.6">${fw.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : '<div class="small muted">No warnings.</div>')
+          + `<div class="small muted">${plural(Q.filter(q => q.sev !== 'info').length, 'gap')} to close before the framework is complete — see Data quality after loading.</div>`)}</div>`
+    + (goal ? rv_node(fw, goal) : '')
+    + `<div class="grid-2 mb">${card('Assumptions', fw.assumptions.length ? `<ul class="small" style="margin:0;padding-left:18px">${fw.assumptions.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '<div class="small muted">None found.</div>')}
+        ${card('Risks', fw.risks.length ? `<ul class="small" style="margin:0;padding-left:18px">${fw.risks.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '<div class="small muted">None found.</div>')}</div>`
+    + `<div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" data-action="rv-discard">Discard</button><button class="btn btn-primary" data-action="rv-accept"><i class="bi bi-check2-circle"></i> Accept and load into Eval360</button></div>`;
+};
+const rv_fw = () => appData.draft && appData.draft.fw;
+CHANGES['rv-fw'] = t => { const fw = rv_fw(); if (!fw) return; fw[t.dataset.f] = t.value.trim(); if (t.dataset.f.startsWith('period')) fw.periodAssumed = []; saveState(); };
+CHANGES['rv-node'] = t => { const fw = rv_fw(); const n = fw && fw.nodes.find(x => x.id === t.dataset.id); if (!n) return; n[t.dataset.f] = t.value.trim(); saveState(); };
+CHANGES['rv-ind'] = t => {
+  const fw = rv_fw(); const i = fw && fw.indicators.find(x => x.id === t.dataset.id); if (!i) return;
+  const k = t.dataset.f;
+  i[k] = ['baseline','target'].includes(k) ? numOrNull(t.value) : t.value.trim();
+  i.prov = i.prov === 'added' ? 'added' : 'edited';
+  t.classList.toggle('flag', ['baseline','target'].includes(k) ? i[k] === null : !i[k]);
+  saveState();
+};
+ACTIONS['rv-add-ind'] = t => {
+  const fw = rv_fw(); const n = fw && fw.nodes.find(x => x.id === t.dataset.id); if (!n) return;
+  const k = Math.max(0, ...fw.indicators.map(i => Number(i.id.slice(1)) || 0)) + 1;
+  fw.indicators.push({id:`I${k}`, node:n.id, code:`${n.code}.i${nodeInds(n.id, fw).length + 1}`, name:'', unit:'', baseline:null, baselineYear:'', target:null, targetYear:'',
+    dir:'increase', frequency:'Quarterly', mov:'', disagg:'', quote:'', confidence:'high', notes:'', prov:'added'});
+  saveState(); redraw();
+};
+ACTIONS['rv-del-ind'] = t => { const fw = rv_fw(); if (!fw) return; fw.indicators = fw.indicators.filter(i => i.id !== t.dataset.id); saveState(); redraw(); };
+ACTIONS['rv-del-node'] = t => {
+  const fw = rv_fw(); if (!fw) return;
+  const ids = [t.dataset.id]; for (let i = 0; i < ids.length; i++) fw.nodes.filter(n => n.parent === ids[i]).forEach(n => ids.push(n.id));
+  const n = fw.nodes.find(x => x.id === t.dataset.id);
+  if (!confirm(`Remove ${nodeLabel(n)} and everything under it (${ids.length - 1} results/activities, ${fw.indicators.filter(i => ids.includes(i.node)).length} indicators)?`)) return;
+  fw.nodes = fw.nodes.filter(x => !ids.includes(x.id)); fw.indicators = fw.indicators.filter(i => !ids.includes(i.node));
+  saveState(); redraw();
+};
+ACTIONS['rv-discard'] = () => {
+  if (!confirm('Discard this extraction? The framework currently loaded stays as it is.')) return;
+  const f = appData.draft.source.filename; appData.draft = null; saveState();
+  addLog(`discarded the extraction of "${f}"`, null, 'bi-x-circle'); showView('import'); toast('Extraction discarded.', 'ok');
+};
+ACTIONS['rv-accept'] = () => {
+  const d = appData.draft; if (!d) return;
+  if (!d.fw.indicators.length && !confirm('This framework has no indicators, so there is nothing to track. Load it anyway?')) return;
+  if (d.fw.periodEnd <= d.fw.periodStart){ toast('The programme end date must be after the start date.', 'warn'); return; }
+  const before = appData.fw ? appData.fw.title : '—';
+  d.source.reviewedAt = nowStamp();
+  const edited = d.fw.indicators.filter(i => i.prov !== 'imported').length;
+  adoptFramework(d.fw, d.source); appData.draft = null; saveState();
+  addLog(`accepted the reviewed framework (${plural(appData.fw.indicators.length, 'indicator')}, ${edited} edited or added)`, {view:'dashboard', meta:''}, 'bi-check2-circle',
+    {old:before, new:appData.fw.title, reason:'Extraction reviewed and accepted'});
+  showView('dashboard'); toast(`"${appData.fw.title}" is live — ${plural(appData.fw.indicators.length, 'indicator')} tracked.`, 'ok');
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   21. SCREENS — dashboard, logframe matrix, results chain, indicators,
+   submissions (verification), data quality, audit trail, reports, about.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const rag3 = v => v === null ? 'grey' : v >= 80 ? 'ok' : v >= 60 ? 'warn' : 'bad';
+const isSample = () => appData.source && appData.source.kind === 'sample';
+const srcBadges = () => isSample() ? `<span class="prov imp"><i class="bi bi-journal-text"></i>Built-in sample (fictional)</span>`
+  : `${impBadge()} ${aiBadge()}`;
+const periodText = fw => `${fmtDate(fw.periodStart)} – ${fmtDate(fw.periodEnd)}`;
+const lastQ = () => appData.quarters[appData.quarters.length - 1] || null;
+const sampleBanner = () => isSample()
+  ? banner('info', 'bi-journal-text', `You are looking at the <b>built-in sample</b> — a fictional programme. ${go('import', '', 'Import your own logframe')} and Eval360 rebuilds every screen on it.`) : '';
+function feedItem(e){
+  const when = e.ts.slice(0, 10) === TODAY_ISO ? e.ts.slice(11) : fmtDate(e.ts);
+  const body = `<b>${esc(e.user)}</b> ${esc(e.text)}`;
+  const chg = (e.old !== null && e.old !== undefined) || (e.new !== null && e.new !== undefined)
+    ? `<div class="small muted" style="margin-top:2px"><span class="mono">${esc(e.old ?? '—')}</span> <i class="bi bi-arrow-right"></i> <span class="mono">${esc(e.new ?? '—')}</span>${e.reason ? ` · ${esc(e.reason)}` : ''}</div>` : '';
+  return `<div class="feed-item"><div class="f-t">${esc(when)}</div><div class="f-ic"><i class="bi ${e.icon}"></i></div>
+    <div style="flex:1;min-width:0">${e.ref && VIEW_RENDERERS[e.ref.view] && canOpen(e.ref.view) ? `<button class="linkish" style="border:0;color:var(--ink);text-align:left" ${goAttrs(e.ref.view, e.ref.meta)}>${body}</button>` : body}${chg}</div></div>`;
+}
+const alertRow = a => `<div class="alert-item"><i class="bi ${a.tone === 'bad' ? 'bi-exclamation-octagon-fill' : a.tone === 'warn' ? 'bi-exclamation-triangle-fill' : 'bi-info-circle-fill'}" style="color:${TONE_VAR[a.tone]}"></i>
+  <div><div class="a-t">${esc(a.text)}</div>${a.detail ? `<div class="a-d">${esc(a.detail)}</div>` : ''}</div>
+  ${a.view ? `<button class="btn btn-sm btn-ghost" ${goAttrs(a.view, a.meta)}>Open</button>` : ''}</div>`;
+
+/* Status of an indicator as it stood at a past quarter — for the trend. */
+function statusAt(ind, qid){
+  if (ind.target === null) return null;
+  const r = appData.results.find(x => x.ind === ind.id && x.quarter === qid); if (!r) return null;
+  const b = effectiveBaseline(ind).v;
+  const ratio = ind.dir === 'maintain' ? 1 - Math.abs(r.value - ind.target) / Math.max(1e-9, Math.abs(ind.target))
+    : Math.abs(r.expected - b) < 1e-9 ? 1 : (r.value - b) / (r.expected - b);
+  return ratio >= .98 ? 'on' : ratio >= 1 - appData.settings.tolerance / 100 ? 'attention' : 'off';
+}
+function indexAt(qid){
+  const S = appData.fw.indicators.map(i => statusAt(i, qid)).filter(Boolean);
+  return S.length ? r1((S.filter(s => s === 'on').length + S.filter(s => s === 'attention').length / 2) / S.length * 100) : null;
+}
+
+/* ═══ Programme dashboard ═══════════════════════════════════════════════════ */
+VIEW_RENDERERS['dashboard'] = () => {
+  const fw = appData.fw, c = statusCounts(), idx = perfIndex(), Q = appData.quarters, lq = lastQ();
+  const pend = appData.results.filter(r => !OFFICIAL.includes(r.state));
+  const issues = qualityIssues().filter(i => i.sev !== 'info');
+  const outcomes = fw.nodes.filter(n => n.level === 'outcome');
+  afterRender(() => { const T = chartTheme();
+    mountChart('db-trend', {type:'line', data:{labels:Q.map(q => q.label), datasets:[{label:'Performance index', data:Q.map(q => indexAt(q.id)),
+      borderColor:T.brand, backgroundColor:T.brand, tension:.3, pointRadius:Q.map((q, i) => i === Q.length - 1 ? 6 : 3)}]}, options:{scales:{y:pctAxis()}}});
+    const lv = ['goal','outcome','output'];
+    mountChart('db-levels', {type:'bar', data:{labels:lv.map(l => LEVELS[l]), datasets:[['on','On track',T.ok],['attention','Needs attention',T.warn],['off','Off track',T.bad],['notarget','Target needed',T.mute]]
+      .map(([k, l, col]) => ({label:l, backgroundColor:col, data:lv.map(L => fw.indicators.filter(i => nodeById(i.node).level === L && indStatus(i).key === k).length)}))},
+      options:Object.assign({}, legendOn, {indexAxis:'y', scales:{x:{stacked:true, ticks:{precision:0}}, y:{stacked:true}}})}); });
+  const pt = (n, text, tone, view, meta) => `<button class="hero-pt" ${goAttrs(view, meta)}><i class="dot" style="background:${TONE_VAR[tone]}"></i><b>${n}</b> ${esc(text)}</button>`;
+  const hero = `<div class="hero">
+      <div class="hpill"><i class="bi bi-calendar3"></i> ${lq ? esc(lq.label) + ' · latest completed quarter' : 'No completed quarter yet'}</div>
+      <h2>${esc(fw.title)}</h2>
+      <div class="hsub">${esc([fw.organisation, fw.country, periodText(fw)].filter(Boolean).join(' · '))}</div>
+      <div class="h-score"><b>${idx === null ? '—' : Math.round(idx) + '%'}</b><span>Performance index</span></div>
+      <div class="hero-points">
+        ${pt(c.on, 'on track', 'ok', 'indicators', 'status=on')}${pt(c.attention, 'need attention', 'warn', 'indicators', 'status=attention')}
+        ${pt(c.off, 'off track', 'bad', 'indicators', 'status=off')}${pt(c.notarget, 'without a target', 'grey', 'quality', '')}
+        ${pt(pend.length, 'results awaiting verification', 'warn', 'submissions', '')}</div></div>`;
+  const outCard = o => { const L = subtreeInds(o.id), pi = perfIndex(L), cc = statusCounts(L);
+    return `<button class="mini" ${goAttrs('result-detail', o.id)} style="text-align:left;cursor:pointer">
+      <div class="m-top"><span class="m-code">${esc(nodeLabel(o)).toUpperCase()}</span>${chip(pi === null ? 'No data' : Math.round(pi) + '%', rag3(pi))}</div>
+      <div style="font-weight:600;font-size:13px;line-height:1.4;margin:6px 0 8px">${esc(o.statement)}</div>
+      ${progressBar(pi || 0, rag3(pi))}
+      <div class="small muted" style="margin-top:6px">${plural(L.length, 'indicator')} · ${cc.on} on track · ${cc.attention} attention · ${cc.off} off</div></button>`; };
+  const off = fw.indicators.filter(i => indStatus(i).key === 'off').slice(0, 6);
+  return pageHead(esc(fw.title), `Programme dashboard · ${srcBadges()} · progress ${demoBadge('illustrative')}`, `<button class="btn btn-sm" data-action="rp-print" data-kind="performance"><i class="bi bi-printer"></i> Performance report</button>`)
+    + sampleBanner()
+    + (fw.timelineShifted ? banner('info', 'bi-hourglass-split', `This programme has not completed three quarters yet, so the illustrative tracking uses the last six quarters to show how monitoring will look.`) : '')
+    + hero
+    + `<div class="kpi-row">
+        ${kpi({label:'Results', value:fw.nodes.filter(n => ['outcome','output'].includes(n.level)).length, sub:`${outcomes.length} outcomes · ${fw.nodes.filter(n => n.level === 'output').length} outputs`, view:'chain'})}
+        ${kpi({label:'Indicators', value:fw.indicators.length, sub:`${fw.indicators.filter(i => i.target !== null).length} with a target`, view:'indicators'})}
+        ${kpi({label:'On track', value:c.on, tone:'ok', view:'indicators', meta:'status=on'})}
+        ${kpi({label:'Needs attention', value:c.attention, tone:'warn', view:'indicators', meta:'status=attention'})}
+        ${kpi({label:'Off track', value:c.off, tone:'bad', view:'indicators', meta:'status=off'})}
+        ${kpi({label:'Awaiting verification', value:pend.length, sub:'Not counted until verified', view:'submissions'})}
+        ${kpi({label:'Framework gaps', value:issues.length, sub:'Missing targets, baselines, verification', tone:issues.length ? 'warn' : 'ok', view:'quality'})}</div>`
+    + (outcomes.length ? `<div class="sec-title">Outcomes</div><div class="card-grid mb" style="grid-template-columns:repeat(auto-fill,minmax(270px,1fr))">${outcomes.map(outCard).join('')}</div>` : '')
+    + `<div class="grid-2 mb">${card('Performance over time', `<div class="chart-wrap"><canvas id="db-trend"></canvas></div><div class="small muted">Share of indicators on track (needs attention counts half). ${demoBadge()}</div>`, {bodyStyle:'padding:8px 12px 12px'})}
+        ${card('Indicator status by level', `<div class="chart-wrap"><canvas id="db-levels"></canvas></div>`, {bodyStyle:'padding:8px'})}</div>`
+    + `<div class="grid-main">${card('Off track — needs a management response', off.map(i => alertRow({tone:'bad', text:`${i.code} — ${i.name}`,
+          detail:`${fmtVal(i, latestOfficial(i).value)} against ${fmtVal(i, latestOfficial(i).expected)} expected by now · target ${fmtVal(i, i.target)}`, view:'indicator-detail', meta:i.id})).join('')
+          || '<div class="small muted">Nothing is off track.</div>', {bodyStyle:'padding-top:4px'})}
+        ${card('Recent activity', appData.log.slice(0, 6).map(feedItem).join('') || '<div class="small muted">No activity yet.</div>', {bodyStyle:'padding-top:4px'})}</div>`;
+};
+
+/* ═══ Logframe matrix — the classic four columns ════════════════════════════ */
+function lfMatrixRows(fw, forPrint){
+  const indCell = n => { const L = nodeInds(n.id, fw); return L.length ? `<ul>${L.map(i => `<li><b>${esc(i.code)}</b> ${esc(i.name)}${i.unit ? ` <span class="${forPrint ? '' : 'muted'}">(${esc(i.unit)})</span>` : ''}<br>
+      <span style="font-size:11px">Baseline ${i.baseline === null ? '<i>not stated</i>' : esc(fmtVal(i, i.baseline)) + (i.baselineYear ? ' (' + esc(i.baselineYear) + ')' : '')} → target ${i.target === null ? '<i>not stated</i>' : esc(fmtVal(i, i.target)) + (i.targetYear ? ' (' + esc(i.targetYear) + ')' : '')}</span></li>`).join('')}</ul>` : '<i>No indicator</i>'; };
+  const movCell = n => { const L = nodeInds(n.id, fw); return L.length ? `<ul>${L.map(i => `<li>${i.mov ? esc(i.mov) : '<i>not stated</i>'}</li>`).join('')}</ul>` : ''; };
+  const asCell = (n, extra = []) => { const A = n.assumptions.concat(extra); return A.length ? `<ul>${A.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''; };
+  const row = (n, extra) => {
+    const acts = n.level === 'output' ? childNodes(n.id, fw).filter(a => a.level === 'activity') : [];
+    const name = forPrint ? `${esc(n.statement)}` : go('result-detail', n.id, esc(n.statement));
+    return `<tr class="${n.level}"><td class="lvl">${esc(nodeLabel(n))}</td><td>${name}${acts.length ? `<div style="margin-top:6px;font-size:11px"><b>Activities:</b> ${acts.map(a => esc(a.statement)).join('; ')}</div>` : ''}</td>
+      <td>${indCell(n)}</td><td>${movCell(n)}</td><td>${asCell(n, extra || [])}</td></tr>`;
+  };
+  const goal = fw.nodes.find(n => n.level === 'goal');
+  let html = goal ? row(goal, fw.assumptions) : '';
+  fw.nodes.filter(n => n.level === 'outcome').forEach(o => { html += row(o); childNodes(o.id, fw).filter(p => p.level === 'output').forEach(p => { html += row(p); }); });
+  return `<table class="lfm"><thead><tr><th>Level</th><th>Results (narrative summary)</th><th>Indicators · baseline → target</th><th>Means of verification</th><th>Assumptions</th></tr></thead><tbody>${html}</tbody></table>`;
+}
+VIEW_RENDERERS['matrix'] = () => {
+  const fw = appData.fw;
+  return pageHead('Logframe matrix', `${esc(fw.title)} · ${srcBadges()}`, `<button class="btn btn-sm" data-action="rp-print" data-kind="matrix"><i class="bi bi-printer"></i> Print / PDF</button>`)
+    + sampleBanner()
+    + `<div class="tbl-scroll card" style="padding:0">${lfMatrixRows(fw, false)}</div>`
+    + (fw.risks.length ? card('Risks', `<ul class="small" style="margin:0;padding-left:18px">${fw.risks.map(r => `<li>${esc(r)}</li>`).join('')}</ul>`, {style:'margin-top:14px'}) : '');
+};
+
+/* ═══ Results chain + result detail ═════════════════════════════════════════ */
+VIEW_RENDERERS['chain'] = () => {
+  const fw = appData.fw, goal = fw.nodes.find(n => n.level === 'goal');
+  const box = n => { const L = subtreeInds(n.id), pi = perfIndex(L);
+    return `<button class="mini" ${goAttrs('result-detail', n.id)} style="text-align:left;cursor:pointer;border-left:3px solid ${TONE_VAR[rag3(pi)]}">
+      <div class="m-top"><span class="m-code"><i class="bi ${LEVEL_ICON[n.level]}"></i> ${esc(nodeLabel(n)).toUpperCase()}</span>${chip(pi === null ? 'No data' : Math.round(pi) + '%', rag3(pi))}</div>
+      <div style="font-size:12.5px;font-weight:600;line-height:1.4;margin-top:5px">${esc(n.statement)}</div>
+      <div class="small muted" style="margin-top:4px">${plural(nodeInds(n.id).length, 'indicator')}</div></button>`; };
+  return pageHead('Results chain', 'From activities to the goal — each result with its own indicators and the performance of everything beneath it.')
+    + sampleBanner()
+    + (goal ? `<div style="max-width:720px;margin:0 auto 14px">${box(goal)}</div><div style="text-align:center;color:var(--ink-mute);margin:-6px 0 8px"><i class="bi bi-arrow-up"></i></div>` : '')
+    + `<div class="card-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start">${fw.nodes.filter(n => n.level === 'outcome').map(o =>
+        `<div class="stack">${box(o)}<div style="text-align:center;color:var(--ink-mute);margin:-4px 0"><i class="bi bi-arrow-up"></i></div>${childNodes(o.id).filter(p => p.level === 'output').map(box).join('')}</div>`).join('')}</div>`;
+};
+VIEW_RENDERERS['result-detail'] = id => {
+  const n = appData.fw.nodes.find(x => x.id === id); if (!n) return pageHead('Result not found', '') + card(null, emptyState('bi-diagram-3', 'No such result', esc(id)));
+  const L = nodeInds(n.id), all = subtreeInds(n.id), pi = perfIndex(all), parent = n.parent ? nodeById(n.parent) : null;
+  const kids = childNodes(n.id);
+  return pageHead(esc(`${nodeLabel(n)} — ${n.statement}`), `${srcBadges()}`, chip(pi === null ? 'No data' : `Performance ${Math.round(pi)}%`, rag3(pi)))
+    + `<div class="grid-main mb">${card('Result', kvTable([['Level', esc(LEVELS[n.level])], ['Code', `<span class="mono">${esc(n.code)}</span>`], ['Statement', esc(n.statement)],
+        ['Contributes to', parent ? go('result-detail', parent.id, esc(`${nodeLabel(parent)} — ${parent.statement}`)) : '—'],
+        ['Assumptions', n.assumptions.length ? n.assumptions.map(esc).join('<br>') : '<span class="muted">None stated</span>'],
+        ['Indicators here / beneath', `${L.length} / ${all.length - L.length}`]]))}
+      ${card(kids.some(k => k.level === 'activity') ? 'Activities' : 'Results beneath', kids.length ? kids.map(k => k.level === 'activity'
+          ? `<div class="m-r" style="padding:4px 0;font-size:12.5px"><i class="bi bi-list-task muted"></i> ${esc(k.statement)}</div>`
+          : alertRow({tone:({ok:'info', grey:'info', warn:'warn', bad:'bad'})[rag3(perfIndex(subtreeInds(k.id)))], text:`${nodeLabel(k)} — ${k.statement}`, view:'result-detail', meta:k.id})).join('') : '<div class="small muted">None.</div>')}</div>`
+    + card('Indicators for this result', ind_table('result-detail-inds', L), {flush:true});
+};
+
+/* ═══ Indicators ════════════════════════════════════════════════════════════ */
+function ind_table(id, rows, opts = {}){
+  return table(id, [
+    {key:'code', label:'Code', render:i => `<span class="code">${esc(i.code)}</span>`},
+    {key:'name', label:'Indicator', render:i => `${esc(i.name) || '<i>unnamed</i>'}<span class="sub">${esc(nodeLabel(nodeById(i.node)))} · ${esc(unitLabel(i))}</span>`},
+    {key:'baseline', label:'Baseline', n:true, sv:i => i.baseline, render:i => i.baseline === null ? `<span class="muted" title="Not stated in the logframe">—</span>` : fmtVal(i, i.baseline)},
+    {key:'latest', label:'Latest verified', n:true, sv:i => (latestOfficial(i) || {}).value ?? null, render:i => { const r = latestOfficial(i); return r ? `<b>${fmtVal(i, r.value)}</b><span class="sub">${esc(r.label)}</span>` : '—'; }},
+    {key:'target', label:'Target', n:true, sv:i => i.target, render:i => i.target === null ? chip('Not set','grey') : `${i.dir === 'decrease' ? '↓ ' : ''}${fmtVal(i, i.target)}`},
+    {key:'ach', label:'Achieved', n:true, sv:i => indAchievement(i), render:i => { const a = indAchievement(i); return a === null ? '—' : `${Math.round(a)}%`; }},
+    {key:'status', label:'Status', sv:i => ['off','attention','on','none','notarget'].indexOf(indStatus(i).key), render:i => statusChip(indStatus(i))}],
+    rows, Object.assign({link:i => ['indicator-detail', i.id], noun:'indicator'}, opts));
+}
+VIEW_RENDERERS['indicators'] = () => {
+  const f = F('indicators'), c = statusCounts(), fw = appData.fw;
+  const rows = fw.indicators.filter(i => (!f.level || nodeById(i.node).level === f.level) && (!f.status || indStatus(i).key === f.status) && qMatch('indicators', i.code, i.name, i.unit, nodeById(i.node).statement));
+  return pageHead('Indicators', `Every indicator in the logframe, with its baseline and target ${impBadge()} and illustrative progress ${demoBadge('illustrative')}.`)
+    + sampleBanner()
+    + `<div class="filterbar">${fSearch('indicators', 'Search indicators')}${fSelect('indicators', 'level', 'Level', [['goal','Goal'],['outcome','Outcome'],['output','Output']])}
+        ${fPills('indicators', 'status', [['', 'All', fw.indicators.length], ['on','On track', c.on], ['attention','Attention', c.attention], ['off','Off track', c.off], ['notarget','No target', c.notarget]])}${fClearAll('indicators')}</div>`
+    + ind_table('indicators-list', rows);
+};
+VIEW_RENDERERS['indicator-detail'] = id => {
+  const i = appData.fw.indicators.find(x => x.id === id); if (!i) return pageHead('Indicator not found', '') + card(null, emptyState('bi-graph-up', 'No such indicator', esc(id)));
+  const n = nodeById(i.node), R = indResults(i), st = indStatus(i), b = effectiveBaseline(i), lr = latestOfficial(i), Q = qualityIssues().filter(q => q.ref === i.id);
+  afterRender(() => { if (!R.length) return; const T = chartTheme();
+    mountChart('id-chart', {type:'line', data:{labels:R.map(r => r.label), datasets:[
+      {label:'Result (illustrative)', data:R.map(r => r.value), borderColor:T.brand, backgroundColor:T.brand, tension:.25, pointStyle:R.map(r => OFFICIAL.includes(r.state) ? 'circle' : 'rectRot'), pointRadius:4},
+      {label:'Expected by then', data:R.map(r => r.expected), borderColor:T.accent, borderDash:[4,4], pointRadius:0},
+      {label:'End-of-programme target', data:R.map(() => i.target), borderColor:T.mute, borderDash:[2,3], pointRadius:0}]}, options:legendOn}); });
+  const provChip = i.prov === 'edited' ? chip('Edited by you during review', 'accent') : i.prov === 'added' ? chip('Added by you during review', 'accent') : isSample() ? chip('Sample', 'grey') : aiBadge();
+  return pageHead(esc(`${i.code} — ${i.name}`), `${esc(nodeLabel(n))} · ${esc(n.statement)}`, `${statusChip(st)} <button class="btn btn-sm" data-action="id-edit" data-id="${esc(i.id)}"><i class="bi bi-pencil"></i> Edit</button>`)
+    + `<div class="kpi-row">
+        ${kpi({label:'Baseline', value:b.v === null ? '—' : fmtVal(i, b.v), sub:b.assumed ? 'Not in the logframe — illustrative assumption' : (i.baselineYear || 'From your logframe'), tone:b.assumed ? 'warn' : null})}
+        ${kpi({label:'Latest verified', value:lr ? fmtVal(i, lr.value) : '—', sub:lr ? `${lr.label} · illustrative` : 'No verified result', tone:st.tone === 'grey' ? null : st.tone})}
+        ${kpi({label:'Expected by now', value:lr ? fmtVal(i, lr.expected) : '—', sub:'Straight-line path from baseline to target'})}
+        ${kpi({label:'Target', value:i.target === null ? 'Not set' : fmtVal(i, i.target), sub:i.targetYear || (i.target === null ? 'Add one to track progress' : ''), tone:i.target === null ? 'warn' : null})}
+        ${kpi({label:'Achieved', value:indAchievement(i) === null ? '—' : Math.round(indAchievement(i)) + '%', sub:'of the change from baseline to target'})}</div>`
+    + `<div class="grid-main mb">${card('Progress against target', R.length ? `<div class="chart-wrap"><canvas id="id-chart"></canvas></div><div class="small muted">◆ = not yet verified. ${demoBadge()}</div>`
+          : emptyState('bi-graph-up', 'Nothing to track yet', i.target === null ? 'This indicator has no numeric target. Add one with Edit.' : 'No baseline or target could be used.'), {bodyStyle:'padding:8px 12px 12px'})}
+      ${card('Definition', kvTable([['Unit', esc(unitLabel(i))], ['Direction', i.dir === 'decrease' ? 'Lower is better' : i.dir === 'maintain' ? 'Maintain the target level' : 'Higher is better'],
+          ['Frequency', esc(i.frequency) || '<span class="muted">not stated</span>'], ['Means of verification', esc(i.mov) || '<span style="color:var(--warn)">not stated</span>'],
+          ['Disaggregation', esc(i.disagg) || '<span class="muted">—</span>'], ['Provenance', provChip],
+          i.quote ? ['In your document', `<span class="small" style="font-style:italic">“${esc(i.quote)}”</span>`] : null,
+          i.notes ? ['AI note', esc(i.notes)] : null]))}</div>`
+    + (Q.length ? card('Gaps for this indicator', Q.map(q => alertRow({tone:q.sev === 'bad' ? 'bad' : q.sev === 'warn' ? 'warn' : 'info', text:q.text})).join(''), {style:'margin-bottom:18px', bodyStyle:'padding-top:4px'}) : '')
+    + (R.length ? card('Quarterly results and verification', table('id-results', [
+        {key:'label', label:'Quarter'}, {key:'value', label:'Result', n:true, render:r => fmtVal(i, r.value)}, {key:'expected', label:'Expected', n:true, render:r => fmtVal(i, r.expected)},
+        {key:'state', label:'Verification', render:r => chip(r.state, STATE_TONE[r.state])}, {key:'ev', label:'Evidence', nosort:true, render:r => r.evidence.length ? `<i class="bi bi-paperclip"></i> ${esc(r.evidence[0])}` : '<span class="muted">none</span>'}],
+        R.slice().reverse(), {noun:'result', nofoot:true, paginate:false}), {flush:true, right:demoBadge()}) : '');
+};
+ACTIONS['id-edit'] = t => {
+  const i = indById(t.dataset.id); if (!i) return;
+  const fld = (k, l, v, type = 'text') => `<div class="fld"><label for="id-e-${k}">${l}</label><input id="id-e-${k}" name="${k}" type="${type}" ${type === 'number' ? 'step="any"' : ''} value="${esc(v ?? '')}"></div>`;
+  openModal({title:`Edit ${i.code}`, body:`<form id="id-edit-form" data-action="id-edit-form" data-id="${esc(i.id)}"><div class="form-grid">
+      <div class="fld full"><label for="id-e-name">Indicator</label><input id="id-e-name" name="name" value="${esc(i.name)}" required></div>
+      ${fld('unit', 'Unit', i.unit)}${fld('frequency', 'Frequency', i.frequency)}
+      ${fld('baseline', 'Baseline', i.baseline, 'number')}${fld('baselineYear', 'Baseline year', i.baselineYear)}
+      ${fld('target', 'Target', i.target, 'number')}${fld('targetYear', 'Target year', i.targetYear)}
+      <div class="fld full"><label for="id-e-mov">Means of verification</label><input id="id-e-mov" name="mov" value="${esc(i.mov)}"></div>
+      <div class="fld full"><label for="id-e-why">Reason for the change</label><input id="id-e-why" name="why" required placeholder="e.g. corrected from the signed logframe"></div></div></form>`,
+    foot:`<button class="btn" data-action="close-modal">Cancel</button><button class="btn btn-primary" type="submit" form="id-edit-form">Save</button>`});
+};
+SUBMITS['id-edit-form'] = (f, fd) => {
+  const i = indById(f.dataset.id); if (!i) return;
+  const why = String(fd.get('why') || '').trim(); if (why.length < 3){ toast('Give a reason for the change.', 'warn'); return; }
+  const was = `${fmtVal(i, i.baseline)} → ${fmtVal(i, i.target)}`, before = perfIndex();
+  Object.assign(i, {name:String(fd.get('name')).trim() || i.name, unit:String(fd.get('unit')).trim(), frequency:String(fd.get('frequency')).trim(),
+    baseline:numOrNull(fd.get('baseline')), baselineYear:String(fd.get('baselineYear')).trim(), target:numOrNull(fd.get('target')),
+    targetYear:String(fd.get('targetYear')).trim(), mov:String(fd.get('mov')).trim(), prov:i.prov === 'added' ? 'added' : 'edited'});
+  generateResults(); saveState();
+  addLog(`edited indicator ${i.code}`, {view:'indicator-detail', meta:i.id}, 'bi-pencil', {old:was, new:`${fmtVal(i, i.baseline)} → ${fmtVal(i, i.target)}`, reason:why});
+  closeModal(); redraw();
+  toast(`${i.code} updated — performance index ${before === null ? '—' : Math.round(before) + '%'} → ${perfIndex() === null ? '—' : Math.round(perfIndex()) + '%'}.`, 'ok');
+};
+
+/* ═══ Data submissions — the verification chain ═════════════════════════════ */
+const STATE_TONE = {Draft:'grey', Submitted:'info', 'Under Review':'brand', 'Clarification Required':'warn', Verified:'ok', Locked:'ok'};
+const SB_NEXT = {Draft:[['Submitted','Submit','Data officer']], Submitted:[['Under Review','Review','Programme manager'], ['Clarification Required','Return','Programme manager']],
+  'Under Review':[['Verified','Verify','M&E officer'], ['Clarification Required','Return','M&E officer']], 'Clarification Required':[['Submitted','Resubmit','Data officer']]};
+VIEW_RENDERERS['submissions'] = () => {
+  const lq = lastQ(), f = F('submissions');
+  if (!lq) return pageHead('Data submissions', '') + card(null, emptyState('bi-check2-square', 'No quarter to report yet', 'Results are submitted after each quarter closes.'));
+  const cur = appData.results.filter(r => r.quarter === lq.id);
+  const states = ['Draft','Submitted','Under Review','Clarification Required','Verified'];
+  const rows = cur.filter(r => (!f.state || r.state === f.state) && qMatch('submissions', indById(r.ind).code, indById(r.ind).name));
+  return pageHead('Data submissions', `${esc(lq.label)} results move from data officer to programme manager to M&E officer. Only verified results count on the dashboard.`)
+    + `<div class="stepper mb">${['Draft','Submitted','Under Review','Verified'].map((s, k) => `<div class="step"><span class="s-n">${k + 1}</span>${esc(s)} <span class="small muted">· ${cur.filter(r => r.state === s).length}</span></div>`).join('')}</div>`
+    + `<div class="filterbar">${fSearch('submissions', 'Search')}${fPills('submissions', 'state', [['', 'All', cur.length]].concat(states.map(s => [s, s, cur.filter(r => r.state === s).length])))}${fClearAll('submissions')}</div>`
+    + table('submissions-list', [
+      {key:'code', label:'Indicator', sv:r => indById(r.ind).code, render:r => `<span class="code">${esc(indById(r.ind).code)}</span> ${esc(indById(r.ind).name)}`},
+      {key:'value', label:'Value', n:true, render:r => fmtVal(indById(r.ind), r.value)},
+      {key:'state', label:'State', sv:r => states.indexOf(r.state), render:r => chip(r.state, STATE_TONE[r.state])},
+      {key:'act', label:'Next step', nosort:true, render:r => (SB_NEXT[r.state] || []).map(([to, l, who]) =>
+        `<button class="btn btn-sm${to === 'Clarification Required' ? '' : ' btn-primary'}" data-action="sb-move" data-id="${esc(r.id)}" data-to="${esc(to)}" title="${esc(who)}">${esc(l)}</button>`).join(' ') || '<span class="muted small">Done</span>'}],
+      rows, {noun:'result', foot:demoBadge()});
+};
+ACTIONS['sb-move'] = t => {
+  const r = appData.results.find(x => x.id === t.dataset.id); if (!r) return;
+  const to = t.dataset.to, ok = (SB_NEXT[r.state] || []).some(([s]) => s === to); if (!ok) return;
+  const i = indById(r.ind), was = r.state, before = statusCounts();
+  r.state = to; appData.overrides[r.id] = to; saveState();
+  addLog(`${to === 'Verified' ? 'verified' : to === 'Clarification Required' ? 'returned for clarification' : 'moved'} the ${r.label} result for ${i.code}`, {view:'indicator-detail', meta:i.id},
+    to === 'Verified' ? 'bi-patch-check' : 'bi-arrow-right-circle', {old:was, new:to, reason:to === 'Verified' ? 'Evidence checked' : null});
+  redraw();
+  const a = statusCounts();
+  toast(to === 'Verified' ? `${i.code} verified — it now counts. On track ${before.on} → ${a.on}, off track ${before.off} → ${a.off}.` : `${i.code}: ${was} → ${to}.`, 'ok');
+};
+
+/* ═══ Data quality — what the logframe still needs ══════════════════════════ */
+VIEW_RENDERERS['quality'] = () => {
+  const fw = appData.fw, Q = qualityIssues(), kinds = [...new Set(Q.map(q => q.kind))];
+  const fields = ['name','unit','baseline','target','mov','frequency'];
+  const filled = fw.indicators.reduce((t, i) => t + fields.filter(k => i[k] !== null && i[k] !== '').length, 0);
+  const comp = fw.indicators.length ? r1(filled / (fw.indicators.length * fields.length) * 100) : 0;
+  const ref = q => q.ref && q.ref.startsWith('I') ? ['indicator-detail', q.ref] : q.ref ? ['result-detail', q.ref] : [null, null];
+  return pageHead('Data quality', 'What the framework still needs before it can be monitored with confidence — the gaps a donor or evaluator would ask about first.')
+    + `<div class="kpi-row">${kpi({label:'Framework completeness', value:Math.round(comp) + '%', sub:'Indicator fields filled: name, unit, baseline, target, verification, frequency', tone:rag3(comp)})}
+        ${kpi({label:'Critical gaps', value:Q.filter(q => q.sev === 'bad').length, sub:'Progress cannot be assessed', tone:'bad'})}
+        ${kpi({label:'Gaps to close', value:Q.filter(q => q.sev === 'warn').length, tone:'warn'})}
+        ${kpi({label:'For information', value:Q.filter(q => q.sev === 'info').length})}</div>`
+    + (Q.length ? kinds.map(k => card(esc(k), Q.filter(q => q.kind === k).map(q => { const [v, m] = ref(q);
+        return alertRow({tone:q.sev === 'bad' ? 'bad' : q.sev === 'warn' ? 'warn' : 'info', text:q.text, view:v, meta:m}); }).join(''), {style:'margin-bottom:14px', bodyStyle:'padding-top:4px', right:plural(Q.filter(q => q.kind === k).length, 'item')})).join('')
+      : card(null, emptyState('bi-patch-check', 'No gaps found', 'Every indicator has a baseline, target, unit and means of verification.')));
+};
+
+/* ═══ Audit trail ═══════════════════════════════════════════════════════════ */
+VIEW_RENDERERS['activity'] = () => pageHead('Audit trail', 'Who changed what, when — with the old value, the new value and the reason. Kept in this browser.')
+  + (appData.log.length ? card(null, appData.log.map(feedItem).join(''), {bodyStyle:'padding-top:4px'}) : card(null, emptyState('bi-clock-history', 'Nothing yet', 'Imports, reviews, edits and verifications appear here.')));
+
+/* ═══ Reports & export ══════════════════════════════════════════════════════ */
+VIEW_RENDERERS['reports'] = () => {
+  const r = (icon, t, d, act, kind) => `<div class="mini"><div class="m-code"><i class="bi ${icon}"></i> ${esc(t).toUpperCase()}</div><p class="small" style="margin:8px 0 12px;line-height:1.55">${esc(d)}</p>
+    <button class="btn btn-sm btn-primary" data-action="${act}" data-kind="${kind}"><i class="bi bi-box-arrow-up-right"></i> Open</button></div>`;
+  return pageHead('Reports & export', 'Generated from the framework and its results — print, save as PDF, or take the data elsewhere.')
+    + `<div class="card-grid" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
+      ${r('bi-table', 'Logframe matrix', 'The four-column logframe — results, indicators with baselines and targets, means of verification, assumptions — ready to print or save as PDF.', 'rp-print', 'matrix')}
+      ${r('bi-graph-up', 'Performance report', 'Quarterly performance: index, status by result, off-track indicators and verification status.', 'rp-print', 'performance')}
+      ${r('bi-clipboard-check', 'Framework gap report', 'Every missing baseline, target, unit and means of verification — the checklist for strengthening the logframe.', 'rp-print', 'quality')}
+      ${r('bi-filetype-csv', 'Indicators (CSV)', 'Every indicator with its result level, baseline, target, latest result and status — opens in Excel.', 'rp-csv', 'indicators')}
+      ${r('bi-filetype-json', 'Framework (JSON)', 'The structured framework exactly as Eval360 holds it — for a developer, or to load into another system.', 'rp-json', 'fw')}
+    </div>`;
+};
+const RP_CSS = `body{font:13px/1.5 Inter,Arial,sans-serif;color:#0f1c2a;margin:28px}h1{font:700 22px Georgia,serif;margin:0 0 4px}.sub{color:#5a6878;margin-bottom:18px}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:16px}th{background:#152a47;color:#fff;text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+  td{border:1px solid #cfd7e0;padding:6px 8px;vertical-align:top}td.lvl{font-weight:700;font-size:10px;text-transform:uppercase;color:#5a6878;width:80px}tr.goal td{background:#eef2f8}
+  ul{margin:0;padding-left:16px}.note{font-size:11px;color:#5a6878;border-top:1px solid #cfd7e0;padding-top:8px;margin-top:18px}
+  .bar{position:sticky;top:0;background:#fff;padding:8px 0 12px}.bar button{font:600 13px Inter,Arial;padding:8px 14px;border-radius:6px;border:1px solid #27466e;background:#27466e;color:#fff;cursor:pointer}
+  @media print{.bar{display:none}body{margin:12mm}}`;
+function rp_open(title, body){
+  const fw = appData.fw;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)} — ${esc(fw.title)}</title><style>${RP_CSS}</style></head><body>
+    <div class="bar"><button onclick="window.print()">Print / Save as PDF</button></div>
+    <h1>${esc(title)}</h1><div class="sub">${esc(fw.title)}${fw.organisation ? ' · ' + esc(fw.organisation) : ''} · ${esc(periodText(fw))} · generated ${fmtDate(TODAY_ISO)} with Eval360</div>
+    ${body}<div class="note">Results framework ${isSample() ? 'from the Eval360 built-in sample (fictional)' : `imported from ${esc(appData.source.filename)}, extracted by AI and reviewed`}. Progress figures are illustrative, generated to demonstrate monitoring — not actual programme results.</div></body></html>`;
+  const url = URL.createObjectURL(new Blob([html], {type:'text/html'}));
+  const w = window.open(url, '_blank');
+  if (!w) toast('The browser blocked the report window — allow pop-ups for this site.', 'warn');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+ACTIONS['rp-print'] = t => {
+  const fw = appData.fw, k = t.dataset.kind;
+  if (k === 'matrix') return rp_open('Logframe matrix', lfMatrixRows(fw, true).replace('class="lfm"', ''));
+  if (k === 'quality') return rp_open('Framework gap report', `<table><thead><tr><th>Area</th><th>Gap</th></tr></thead><tbody>${qualityIssues().map(q => `<tr><td>${esc(q.kind)}</td><td>${esc(q.text)}</td></tr>`).join('')}</tbody></table>`);
+  const c = statusCounts(), lq = lastQ();
+  rp_open('Performance report', `<p><b>Performance index ${perfIndex() === null ? '—' : Math.round(perfIndex()) + '%'}</b>${lq ? ` at ${esc(lq.label)}` : ''} · ${c.on} on track · ${c.attention} need attention · ${c.off} off track · ${c.notarget} without a target.</p>
+    <table><thead><tr><th>Result</th><th>Indicator</th><th>Baseline</th><th>Latest verified</th><th>Target</th><th>Status</th></tr></thead><tbody>${fw.indicators.map(i => { const r = latestOfficial(i);
+      return `<tr><td>${esc(nodeLabel(nodeById(i.node)))}</td><td><b>${esc(i.code)}</b> ${esc(i.name)}</td><td>${esc(fmtVal(i, i.baseline))}</td><td>${r ? esc(fmtVal(i, r.value)) + ' (' + esc(r.label) + ')' : '—'}</td><td>${esc(fmtVal(i, i.target))}</td><td>${esc(indStatus(i).label)}</td></tr>`; }).join('')}</tbody></table>`);
+};
+ACTIONS['rp-csv'] = () => {
+  const fw = appData.fw, q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [['Level','Result code','Result','Indicator code','Indicator','Unit','Baseline','Baseline year','Target','Target year','Direction','Means of verification','Latest verified (illustrative)','Quarter','Status'].map(q).join(',')]
+    .concat(fw.indicators.map(i => { const n = nodeById(i.node), r = latestOfficial(i);
+      return [LEVELS[n.level], n.code, n.statement, i.code, i.name, i.unit, i.baseline, i.baselineYear, i.target, i.targetYear, i.dir, i.mov, r ? r.value : '', r ? r.label : '', indStatus(i).label].map(q).join(','); }));
+  downloadBlob(`${slugFile(fw.title)}_indicators_${TODAY_ISO}.csv`, 'text/csv;charset=utf-8', '﻿' + lines.join('\r\n'));
+};
+ACTIONS['rp-json'] = () => { const fw = appData.fw;
+  downloadBlob(`${slugFile(fw.title)}_framework_${TODAY_ISO}.json`, 'application/json', JSON.stringify({framework:fw, source:appData.source, exported:TODAY_ISO}, null, 2)); };
+
+/* ═══ How this works ════════════════════════════════════════════════════════ */
+VIEW_RENDERERS['about'] = () => {
+  const ai = appData.ai, s = appData.source || {};
+  return pageHead('How this works', 'What happens to your document, where each figure comes from, and how to start over.')
+    + `<div class="grid-2 mb">${card('Where each figure comes from', `
+        <div class="alert-item">${impBadge()}<div class="small">Results, indicator wording, baselines, targets, means of verification and assumptions — from your logframe.</div></div>
+        <div class="alert-item">${aiBadge()}<div class="small">Read from your document by AI, then checked by you on the review screen before use. Edits you made are marked on the indicator.</div></div>
+        <div class="alert-item">${demoBadge()}<div class="small">Every quarterly result, status and trend. Generated so the demo can show monitoring; the same logframe always gives the same figures. Not your actual results.</div></div>`)}
+      ${card('Your document and your data', `<ul class="small" style="margin:0;padding-left:18px;line-height:1.7">
+          <li>Word and Excel files are converted to text in your browser. PDFs and text are sent through this site to OpenAI for extraction.</li>
+          <li>This site does not store your document. It keeps a count of imports per visitor per day, and token usage for cost tracking — not the content.</li>
+          <li>The extracted framework is kept only in this browser (local storage). Nobody else can see it.</li>
+          <li>Do not upload documents you are not permitted to share with a third-party AI service.</li></ul>`)}</div>`
+    + `<div class="grid-2">${card('Current framework', kvTable([['Framework', esc(appData.fw.title)], ['Source', s.kind === 'sample' ? 'Built-in sample' : esc(s.filename || '—')],
+          ['Extracted by', esc(s.model || '—')], ['Extracted', s.extractedAt ? fmtDate(s.extractedAt.slice(0, 10)) : '—'], ['Reviewed and accepted', esc(s.reviewedAt || '—')],
+          ['AI import here', ai.available ? `${chip(ai.mock ? 'On — mock mode' : 'On', 'ok')} ${esc(ai.model)}` : chip(ai.offline ? 'Needs the hosted demo' : 'Not configured', 'warn')],
+          ['Imports left today', ai.remaining === null || ai.remaining === undefined ? '—' : num(ai.remaining)]]))}
+      ${card('Settings', `<div class="form-grid"><div class="fld"><label for="ab-tol">Tolerance band</label>
+          <select id="ab-tol" data-action="ab-tol">${[5,10,15,20].map(v => `<option value="${v}"${appData.settings.tolerance === v ? ' selected' : ''}>${v}% — below expected by up to ${v}% = needs attention</option>`).join('')}</select></div></div>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line-soft)"><div class="small" style="margin-bottom:8px">Remove your framework and history from this browser and return to the sample.</div>
+          <button class="btn btn-sm btn-danger" data-action="ab-reset"><i class="bi bi-trash3"></i> Start over</button></div>`)}</div>`;
+};
+CHANGES['ab-tol'] = t => { const was = appData.settings.tolerance, before = statusCounts(); appData.settings.tolerance = Number(t.value); saveState();
+  addLog('changed the tolerance band', {view:'about', meta:''}, 'bi-sliders', {old:was + '%', new:t.value + '%', reason:'Settings'});
+  redraw(); const a = statusCounts(); toast(`Tolerance ${was}% → ${t.value}%. Needs attention ${before.attention} → ${a.attention}, off track ${before.off} → ${a.off}.`, 'ok'); };
+ACTIONS['ab-reset'] = () => {
+  if (!confirm('Remove your framework, edits and history from this browser?')) return;
+  clearState(); appData.log = []; appData.draft = null; loadSample(); showView('dashboard'); toast('Cleared. The sample logframe is loaded.', 'ok');
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   30. ROUTER — one dispatcher: sidebar, topbar, renderer, charts.
+   ═══════════════════════════════════════════════════════════════════════════ */
+let currentView = 'dashboard', currentMeta = '';
+function navBadges(){
+  const b = {}, put = (k, n, cls) => { if (n) b[k] = `<span class="nav-badge ${cls}">${n}</span>`; };
+  put('review', appData.draft ? 1 : 0, 'warn');
+  const lq = lastQ(); put('submissions', lq ? appData.results.filter(r => r.quarter === lq.id && !OFFICIAL.includes(r.state)).length : 0, 'warn');
+  put('quality', qualityIssues().filter(q => q.sev === 'bad').length, 'urgent');
+  put('indicators', statusCounts().off, 'urgent');
+  return b;
+}
+function buildSidebar(){
+  const active = DETAIL_VIEWS[currentView] ? DETAIL_VIEWS[currentView].parent : currentView, badges = navBadges();
+  document.getElementById('sb-nav').innerHTML = NAV.map(g => {
+    const items = g.items.filter(i => viewAccess(i.key) !== 'none');
+    return items.length ? `<div class="sb-group">${esc(g.group)}</div>` + items.map(i => `<button class="nav-item${active === i.key ? ' active' : ''}" data-action="go" data-view="${i.key}" data-nav="1">
+        <i class="bi ${i.icon}"></i><span>${esc(i.label)}</span>${badges[i.key] || ''}</button>`).join('') : '';
+  }).join('');
+}
+function updateChrome(){
+  const ai = appData.ai, p = document.getElementById('ai-pill');
+  if (p){ p.className = 'chip ' + (!ai.checked ? 'grey' : ai.available ? 'ok' : 'warn');
+    p.innerHTML = `<i class="bi bi-stars"></i> ${!ai.checked ? 'Checking AI…' : ai.available ? (ai.mock ? 'AI import (mock)' : 'AI import on') : 'AI import off'}`; }
+  const o = document.getElementById('sb-org'); if (o && appData.fw) o.textContent = isSample() ? 'Sample programme' : (appData.fw.organisation || appData.fw.title).slice(0, 40);
+  const q = qualityIssues().filter(x => x.sev !== 'info').length, t = document.getElementById('check-chip-text');
+  if (t) t.textContent = q ? `${plural(q, 'framework gap')}` : 'Framework complete';
+}
+function showView(name, meta){
+  if (!VIEW_RENDERERS[name] || viewAccess(name) === 'none'){ name = 'dashboard'; meta = ''; }
+  destroyCharts();
+  const ae = document.activeElement, focusId = ae && ae.id && ae.tagName === 'INPUT' && ae.type === 'search' ? ae.id : null;
+  const caret = focusId ? ae.selectionStart : null, sameView = name === currentView;
+  currentView = name; currentMeta = meta || '';
+  const d = DETAIL_VIEWS[name], nav = navItem(d ? d.parent : name);
+  document.getElementById('tb-title').textContent = d ? d.title : (nav ? nav.label : name);
+  document.getElementById('tb-crumb').textContent = navGroup(d ? d.parent : name) + (d && nav ? ' · ' + nav.label : '');
+  pendingMounts = [];
+  let html;
+  try { html = VIEW_RENDERERS[name](meta); }
+  catch(e){ console.error(e); html = emptyState('bi-bug', 'This screen could not be drawn', esc(String(e && e.message || e))); }
+  document.getElementById('main').innerHTML = `<section class="view" id="view-${name}">${html}</section>`;
+  pendingMounts.forEach(fn => { try { fn(); } catch(e){ console.warn('chart mount failed', e); } });
+  pendingMounts = [];
+  buildSidebar(); updateChrome();
+  document.getElementById('sidebar').classList.remove('open'); document.getElementById('sb-backdrop').classList.remove('open');
+  if (focusId){ const el = document.getElementById(focusId); if (el){ el.focus(); try { el.setSelectionRange(caret, caret); } catch(e){} } }
+  else if (!sameView || !keepScroll) window.scrollTo(0, 0);
+  keepScroll = false;
+}
+let keepScroll = false;
+const redraw = () => { keepScroll = true; showView(currentView, currentMeta); };
+
+/* ═══ 31. EVENTS — data-action delegation ═══════════════════════════════════ */
+ACTIONS['go'] = t => {
+  const view = t.dataset.view, meta = t.dataset.meta || '';
+  if (t.dataset.nav) FILTERS[view] = {};
+  if (meta.includes('=') && !DETAIL_VIEWS[view]){
+    FILTERS[view] = parseMeta(meta); resetPages(view);
+    if (FILTERS[view].tab) TABS[view] = FILTERS[view].tab;
+    showView(view, '');
+  } else showView(view, meta);
+};
+ACTIONS['close-modal'] = () => closeModal();
+ACTIONS['modal-backdrop'] = (t, e) => { if (e.target.id === 'modal-root') closeModal(); };
+ACTIONS['open-sidebar'] = () => { document.getElementById('sidebar').classList.add('open'); document.getElementById('sb-backdrop').classList.add('open'); };
+ACTIONS['close-sidebar'] = () => { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sb-backdrop').classList.remove('open'); };
+ACTIONS['tbl-sort'] = t => {
+  const s = TBL[t.dataset.tbl] || (TBL[t.dataset.tbl] = {sort:null, page:0});
+  s.sort = s.sort && s.sort.key === t.dataset.key ? {key:t.dataset.key, dir:-s.sort.dir} : {key:t.dataset.key, dir:1};
+  s.page = 0; redraw();
+};
+ACTIONS['tbl-page'] = t => { const s = TBL[t.dataset.tbl]; if (s){ s.page = Math.max(0, Number(t.dataset.page)); redraw(); } };
+ACTIONS['tbl-csv'] = t => tableCsv(t.dataset.tbl);
+ACTIONS['flt-set'] = t => { const f = F(t.dataset.scope); f[t.dataset.key] = f[t.dataset.key] === t.dataset.value ? '' : t.dataset.value; resetPages(t.dataset.scope); redraw(); };
+ACTIONS['flt-clear'] = t => { delete F(t.dataset.scope)[t.dataset.key]; resetPages(t.dataset.scope); redraw(); };
+ACTIONS['flt-reset'] = t => { FILTERS[t.dataset.scope] = {}; resetPages(t.dataset.scope); redraw(); };
+ACTIONS['tab'] = t => { TABS[t.dataset.scope] = t.dataset.tab; redraw(); };
+ACTIONS['ev-open'] = t => toast(`${t.dataset.file} — placeholder evidence file in this demonstration.`, 'ok');
+CHANGES['flt'] = t => { F(t.dataset.scope)[t.dataset.key] = t.value; resetPages(t.dataset.scope); redraw(); };
+function resetPages(scope){ Object.keys(TBL).forEach(k => { if (k.startsWith(scope)) TBL[k].page = 0; }); }
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-action]');
+  if (!t || t.tagName === 'SELECT' || t.tagName === 'FORM' || t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type !== 'button' && t.type !== 'checkbox')) return;
+  const fn = ACTIONS[t.dataset.action];
+  if (fn){ if (t.tagName === 'A') e.preventDefault(); fn(t, e); }
+});
+document.addEventListener('change', e => { const t = e.target.closest('[data-action]'); if (t && CHANGES[t.dataset.action]) CHANGES[t.dataset.action](t, e); });
+let qTimer = null;
+document.addEventListener('input', e => {
+  const t = e.target.closest('[data-action="flt-q"]'); if (!t) return;
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => { F(t.dataset.scope).q = t.value; resetPages(t.dataset.scope); redraw(); }, 220);
+});
+document.addEventListener('submit', e => {
+  const f = e.target.closest('[data-action]'); if (!f || !SUBMITS[f.dataset.action]) return;
+  e.preventDefault(); SUBMITS[f.dataset.action](f, new FormData(f));
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+/* ═══ 32. AUDIT TRAIL — who, what, when, old value, new value, reason ══════ */
+function addLog(text, ref, icon = 'bi-pencil-square', chg = {}){
+  appData.log.unshift({ts:nowStamp(), user:currentUser.name, icon, text, ref:ref || null, old:chg.old ?? null, new:chg.new ?? null, reason:chg.reason || null, live:true});
+  saveState();
+}
+
+/* ═══ 33. SELF-TEST — open with #selftest. Renders every screen against the
+   sample and against awkward frameworks, and checks the model's invariants. */
+function selfTest(){
+  const out = [], checks = [];
+  const check = (name, got, want) => checks.push({name, got, want, pass:JSON.stringify(got) === JSON.stringify(want)});
+  const renderAll = label => {
+    const ids = {'indicator-detail':appData.fw.indicators.slice(0, 4).map(i => i.id).concat(['I999']), 'result-detail':appData.fw.nodes.slice(0, 5).map(n => n.id).concat(['N999'])};
+    Object.keys(VIEW_RENDERERS).forEach(v => { if (viewAccess(v) === 'none') return; (ids[v] || ['']).forEach(m => {
+      try { pendingMounts = []; const h = VIEW_RENDERERS[v](m); pendingMounts.forEach(fn => fn()); destroyCharts();
+        if (/<img src=x|<script>alert/i.test(h)) out.push(`FAIL ${label} ${v} ${m}: unescaped markup`); }
+      catch(e){ out.push(`FAIL ${label} ${v} ${m}: ${e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e}`); } }); });
+  };
+  const saved = {fw:appData.fw, source:appData.source, draft:appData.draft, overrides:appData.overrides, log:appData.log};
+  // 1 · The sample
+  loadSample();
+  const fw = appData.fw, lv = l => fw.nodes.filter(n => n.level === l).length;
+  check('Sample: 1 goal · 3 outcomes · 5 outputs · 15 activities · 17 indicators', [lv('goal'), lv('outcome'), lv('output'), lv('activity'), fw.indicators.length], [1, 3, 5, 15, 17]);
+  check('Sample gaps detected: missing baseline 1.2.2 · missing verification 2.1.2 · missing target 2.2.2',
+    ['1.2.2','2.1.2','2.2.2'].map(c => qualityIssues().filter(q => q.ref === fw.indicators.find(i => i.code === c).id).map(q => q.kind)),
+    [['Baseline'], ['Means of verification'], ['Target', 'AI confidence']]);
+  check('Every indicator with a target has results; the one without has none', fw.indicators.filter(i => (i.target !== null) !== (indResults(i).length > 0)).length, 0);
+  check('Every result is labelled illustrative', appData.results.every(r => r.source_type === 'ILLUSTRATIVE'), true);
+  const v1 = JSON.stringify(appData.results.map(r => r.value)); generateResults();
+  check('Same logframe, same figures (seeded)', JSON.stringify(appData.results.map(r => r.value)), v1);
+  check('Unverified results never reach the dashboard', fw.indicators.every(i => { const r = latestOfficial(i); return !r || OFFICIAL.includes(r.state); }), true);
+  check('Percent results stay within 0–100', appData.results.filter(r => indById(r.ind).unit === '%' && (r.value < 0 || r.value > 100)).length, 0);
+  check('Status mix present (on, attention or off)', statusCounts().on > 0 && statusCounts().on + statusCounts().attention + statusCounts().off >= 10, true);
+  renderAll('sample');
+  // 2 · Awkward extractions: no dates, no targets, future start, markup in text, empty outcomes
+  const edge = [
+    {title:'<img src=x onerror=alert(1)> Edge', goal:{code:'', statement:'<script>alert(1)<\/script>', indicators:[{code:'<img src=x>', name:'<img src=x onerror=alert(2)>', unit:'<b>u</b>', baseline:1, target:5, source_quote:'<img src=x>', notes:'<script>alert(3)<\/script>'}]}, outcomes:[], assumptions:[], risks:[], warnings:[]},
+    {title:'No dates', goal:{statement:'Goal', indicators:[{code:'', name:'Rate', unit:'%', baseline:null, target:null, direction:'decrease'}]},
+     outcomes:[{statement:'Outcome A', indicators:[{name:'Count', unit:'', baseline:5, target:5, direction:'maintain'}], outputs:[{statement:'Output', indicators:[], activities:['x']}]}]},
+    {title:'Future programme', period_start:'2031', period_end:'December 2034', goal:{statement:'Goal', indicators:[{name:'People reached', unit:'people', baseline:0, target:1000, target_year:'2034'}]}, outcomes:[]},
+    {title:'Year-only dates', period_start:'Jan 2024', period_end:'2026', goal:{statement:'Goal', indicators:[{name:'Mortality', unit:'per 1,000', baseline:40, target:20, direction:'decrease'}]}, outcomes:[]}
+  ];
+  edge.forEach((x, k) => { try { const f2 = normaliseFramework(x); adoptFramework(f2, {kind:'ai', filename:`edge-${k}`, model:'test'}); renderAll(`edge${k}`); }
+    catch(e){ out.push(`FAIL edge${k} normalise: ${e && e.message}`); } });
+  // The review screen, with a hostile and a normal extraction pending.
+  [edge[0], SAMPLE_FRAMEWORK, edge[1]].forEach((x, k) => { appData.draft = {fw:normaliseFramework(x), source:{kind:'ai', filename:'<b>review</b>', model:'test'}};
+    try { const h = VIEW_RENDERERS['review'](''); if (/<img src=x|<script>alert|<b>review/i.test(h)) out.push(`FAIL review${k}: unescaped markup`); }
+    catch(e){ out.push(`FAIL review${k}: ${e && e.message}`); } });
+  appData.draft = null;
+  check('Future programme gets an illustrative six-quarter window', (() => { adoptFramework(normaliseFramework(edge[2]), {kind:'ai', filename:'f'}); return [appData.fw.timelineShifted, appData.quarters.length]; })(), [true, 6]);
+  check('Year-only dates parse to 1 Jan 2024 – 31 Dec 2026', (() => { const f3 = normaliseFramework(edge[3]); return [f3.periodStart, f3.periodEnd]; })(), ['2024-01-01', '2026-12-31']);
+  check('A decreasing indicator falls from baseline', (() => { adoptFramework(normaliseFramework(edge[3]), {kind:'ai', filename:'d'}); const R = appData.results; return R.length > 1 && R[R.length - 1].value < 40; })(), true);
+  // restore
+  Object.assign(appData, saved); if (appData.fw) generateResults();
+  const fails = checks.filter(c => !c.pass);
+  out.unshift(`CHECKS ${checks.length - fails.length}/${checks.length}` + fails.map(f => `\n  CHECKFAIL ${f.name}: got ${JSON.stringify(f.got)} want ${JSON.stringify(f.want)}`).join(''));
+  out.push(`VIEWS ${Object.keys(VIEW_RENDERERS).length} · RESULTS ${out.filter(x => x.startsWith('FAIL')).length} failures`);
+  const pre = document.createElement('pre'); pre.id = 'selftest'; pre.textContent = out.join('\n'); document.body.appendChild(pre);
+}
+
+/* ═══ 34. INIT ══════════════════════════════════════════════════════════════ */
+(function init(){
+  const hash = location.hash.replace('#', '');
+  if (hash === 'selftest'){ loadSample(); selfTest(); showView('dashboard'); return; }
+  if (loadState()) generateResults(); else loadSample();
+  im_checkStatus();
+  const [v, m] = hash.split('/');
+  const meta = decodeURIComponent(m || '');
+  if (v && VIEW_RENDERERS[v]){
+    if (meta.includes('=') && !DETAIL_VIEWS[v]){ FILTERS[v] = parseMeta(meta); showView(v, ''); } else showView(v, meta);
+  } else showView(appData.draft ? 'review' : 'dashboard');
+})();
+</script>
+</body>
+</html>
