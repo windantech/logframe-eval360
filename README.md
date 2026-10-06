@@ -1,22 +1,26 @@
-# Eval360 · Bring your own logframe
+# Eval360 · Your organisation, set up by AI
 
-A public Eval360 demonstration: upload your logical framework (PDF, Word, Excel, CSV or text),
-AI reads it into a structured results framework, you review and correct it, and Eval360 runs on it —
-dashboard, logframe matrix, results chain, indicator tracking, verification workflow, data quality
-and reports.
+A public Eval360 demonstration that sets itself up for **your organisation**. Enter the organisation's
+name and website: AI reads the website and builds the organisation profile, strategic goals and a list of
+programmes. For each programme, upload its logframe (PDF, Word, Excel, CSV or text) or let AI draft a
+realistic one. Review everything, then Eval360 runs on it, in your brand colours: executive dashboard
+across programmes, strategic goals, portfolio, a dashboard, logframe matrix, results chain and indicators
+per programme, a verification workflow, framework quality, an audit trail and printable reports.
 
-- The **framework** is yours. The AI keeps your wording and never invents baselines or targets.
+- **Website facts** keep a link to the page they came from.
+- **Uploaded logframes** are read as written — the AI keeps your wording and never invents baselines or targets.
+- **AI-drafted** goals, programmes and logframes are labelled as proposals everywhere.
 - Nothing goes live until **you review** the extraction.
-- **Progress figures are illustrative**, generated to show how Eval360 tracks results, and labelled.
-- Your document goes to OpenAI through the server and is **not stored**; the framework stays in your browser.
+- **Progress, budget and reach figures are illustrative**, generated to show how Eval360 tracks results, and labelled.
+- Website pages and documents go to OpenAI through the server and are **not stored**; the set-up stays in your browser.
 
-Without AI configured (or opened from disk) the demo still works with the built-in sample.
+Without AI configured (or opened from disk) the demo still works with the built-in sample organisation.
 
 ## Run the tests
 
 ```bash
 bash scripts/selftest.sh
-bash scripts/e2e.sh        # needs PHP and Chrome; no API key (mock mode)
+bash scripts/e2e.sh        # full set-up through PHP + a local fixture website; no API key (mock mode)
 ```
 
 ## Deploy

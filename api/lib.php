@@ -59,7 +59,7 @@ function lf_config(): array
         'mock'          => lf_env('AI_MOCK') === '1',
         'model'         => lf_env('OPENAI_MODEL', 'gpt-4.1-mini'),
         'endpoint'      => lf_env('OPENAI_ENDPOINT', 'https://api.openai.com/v1/responses'),
-        'per_ip_day'    => lf_int('AI_LIMIT_PER_IP_DAY', 10),
+        'per_ip_day'    => lf_int('AI_LIMIT_PER_IP_DAY', 25),
         'total_day'     => lf_int('AI_LIMIT_TOTAL_DAY', 300),
         'max_chars'     => lf_int('AI_MAX_TEXT_CHARS', 150000),
         'max_pdf_bytes' => lf_int('AI_MAX_PDF_MB', 8) * 1024 * 1024,
@@ -247,16 +247,22 @@ and return empty arrays and empty strings elsewhere.
 TXT;
 }
 
-/* ═══ OpenAI — Responses API with strict JSON schema ═══════════════════════ */
+/* ═══ OpenAI — Responses API with strict JSON schema ═══════════════════════
+   One client for every endpoint: logframe extraction, organisation profile,
+   logframe drafting. $required = top-level keys the answer must have. */
 function lf_openai_extract(array $userContent): array
+{
+    return lf_openai_call(lf_instructions(), $userContent, 'logframe', lf_schema(), isset($userContent[1]) ? 'pdf' : 'text', ['goal', 'outcomes']);
+}
+function lf_openai_call(string $instructions, array $userContent, string $name, array $schema, string $kind, array $required, ?int $maxOut = null): array
 {
     $cfg = lf_config();
     $payload = [
         'model' => $cfg['model'],
-        'instructions' => lf_instructions(),
+        'instructions' => $instructions,
         'input' => [['role' => 'user', 'content' => $userContent]],
-        'text' => ['format' => ['type' => 'json_schema', 'name' => 'logframe', 'strict' => true, 'schema' => lf_schema()]],
-        'max_output_tokens' => $cfg['max_out'],
+        'text' => ['format' => ['type' => 'json_schema', 'name' => $name, 'strict' => true, 'schema' => $schema]],
+        'max_output_tokens' => $maxOut ?? $cfg['max_out'],
         'store' => false,
     ];
     $t0 = microtime(true);
@@ -277,7 +283,7 @@ function lf_openai_extract(array $userContent): array
 
     $json = is_string($body) ? json_decode($body, true) : null;
     $ok = $code >= 200 && $code < 300 && is_array($json) && empty($json['error']);
-    lf_usage_log($cfg['model'], is_array($json) ? ($json['usage'] ?? null) : null, $ok, isset($userContent[1]) ? 'pdf' : 'text', $secs);
+    lf_usage_log($cfg['model'], is_array($json) ? ($json['usage'] ?? null) : null, $ok, $kind, $secs);
 
     if ($body === false || $code === 0) {
         lf_fail('Could not reach the AI service. Please try again in a minute.', 502, 'unreachable');
@@ -295,11 +301,11 @@ function lf_openai_extract(array $userContent): array
         };
         lf_fail($public, 502, 'provider_' . $code);
     }
-    return lf_parse_response($json);
+    return lf_parse_response($json, $required);
 }
 
 /* Pull the structured JSON out of a Responses API body. */
-function lf_parse_response(array $json): array
+function lf_parse_response(array $json, array $required = ['goal', 'outcomes']): array
 {
     if (($json['status'] ?? '') === 'incomplete') {
         $why = (string) ($json['incomplete_details']['reason'] ?? 'unknown');
@@ -316,7 +322,7 @@ function lf_parse_response(array $json): array
     }
     if ($text === null && isset($json['output_text'])) $text = (string) $json['output_text'];
     $data = $text !== null ? json_decode($text, true) : null;
-    if (!is_array($data) || !isset($data['goal'], $data['outcomes'])) {
+    if (!is_array($data) || array_diff($required, array_keys($data))) {
         lf_fail('The AI response could not be read. Please try again.', 502, 'bad_output');
     }
     return $data;

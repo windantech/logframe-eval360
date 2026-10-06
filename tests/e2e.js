@@ -1,36 +1,59 @@
-/* TEST BUILD ONLY — never part of the shipped page. Open with #e2e on a server running api/ in AI_MOCK mode. */
+/* TEST BUILD ONLY — injected by scripts/e2e.sh, never part of the shipped page.
+   Runs the whole set-up against api/ in AI_MOCK mode, with a local fixture website. */
 if (location.hash === '#e2e') (async () => {
   const out = [], ok = (name, cond, info = '') => out.push(`${cond ? 'PASS' : 'FAIL'} ${name}${info ? ' — ' + info : ''}`);
+  const SITE = new URLSearchParams(location.search).get('site') || 'http://127.0.0.1:8811/';
   try {
     await im_checkStatus();
-    ok('status endpoint reports AI available (mock)', appData.ai.available && appData.ai.mock, JSON.stringify(appData.ai));
+    ok('Status endpoint reports AI available (mock)', appData.ai.available && appData.ai.mock);
+    ok('First visit opens the set-up wizard', currentView === 'setup');
+    // File converters
     const fileFrom = async (path, name, type) => new File([await (await fetch(path)).blob()], name, {type});
-    const csv = await im_filePayload(await fileFrom('samples/sample_logframe.csv', 'sample_logframe.csv', 'text/csv'));
-    ok('CSV read as text', csv.kind === 'text' && csv.text.includes('Apprenticeships completed'), `${csv.chars} chars`);
     const docx = await im_filePayload(await fileFrom('samples/sample_logframe.docx', 'sample_logframe.docx', ''));
-    ok('Word (.docx) converted in the browser, table rows kept', docx.kind === 'text' && /Apprenticeships completed \| apprenticeships \| 0/.test(docx.text), docx.text.split('\n')[3]);
+    ok('Word (.docx) converted in the browser, table rows kept', docx.kind === 'text' && /Apprenticeships completed \| apprenticeships \| 0/.test(docx.text));
     const pdf = await im_filePayload(await fileFrom('samples/sample_logframe.pdf', 'sample_logframe.pdf', 'application/pdf'));
-    ok('PDF sent as a file (base64)', pdf.kind === 'pdf' && atob(pdf.file_base64.slice(0, 8)).startsWith('%PDF'));
+    ok('PDF sent as a file', pdf.kind === 'pdf' && atob(pdf.file_base64.slice(0, 8)).startsWith('%PDF'));
     await im_loadScript(LIBS.xlsx);
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Level','Result','Indicator','Baseline','Target'],['Goal','Improved learning outcomes','Pupils reading at grade level (%)',34,60],['Output','Teachers trained in structured pedagogy','Teachers trained',0,400]]), 'Logframe');
     const xl = await im_filePayload(new File([XLSX.write(wb, {type:'array', bookType:'xlsx'})], 'lf.xlsx'));
-    ok('Excel (.xlsx) converted in the browser', xl.kind === 'text' && xl.text.includes('Teachers trained,0,400'), xl.text.replace(/\n/g, ' / '));
+    ok('Excel (.xlsx) converted in the browser', xl.kind === 'text' && xl.text.includes('Teachers trained,0,400'));
     let bad = null; try { await im_filePayload(new File(['x'], 'old.doc')); } catch(e){ bad = e.message; }
-    ok('Old .doc rejected with advice', !!bad && bad.includes('.docx'), bad);
-    await im_run(async () => docx, 'sample_logframe.docx');
-    ok('Proxy returned a framework; review screen opened', !!appData.draft && currentView === 'review', im_state.error || '');
-    ok('Nothing went live before review', appData.fw.title !== (appData.draft && appData.draft.fw.title));
+    ok('Old .doc rejected with advice', !!bad && bad.includes('.docx'));
+    // Step 1 — organisation and website
+    const fd = new FormData(); fd.set('name', 'Kijani Water Trust'); fd.set('website', SITE); fd.set('country', 'Kenya'); fd.set('description', 'We drill boreholes.');
+    await SUBMITS['su-org-form'](document.createElement('form'), fd);
+    const s = appData.setup;
+    ok('Website read and profile built', s.stage === 'programmes' && s.org.name === 'Kijani Water Trust' && s.org.source.pages.length === 3, s.error || `${s.org.source.pages.length} pages`);
+    ok('Facts keep the page they came from', s.org.facts.some(f => f.url === SITE), JSON.stringify(s.org.facts.map(f => f.url)));
+    ok('Brand colours picked up from the website', s.org.brand.primary === '#0b6e4f' && s.org.brand.swatches.includes('#f2a541'), JSON.stringify(s.org.brand));
+    ok('Programmes proposed', s.programmes.length === 2);
+    // Step 2 — one uploaded logframe, one AI draft
+    s.programmes[0].mode = 'upload'; s.programmes[0].payload = docx; s.programmes[0].filename = 'sample_logframe.docx';
+    ACTIONS['su-build']();
+    for (let i = 0; i < 100 && appData.setup.stage !== 'review'; i++) await new Promise(r => setTimeout(r, 100));
+    ok('Both programmes built; review opened', appData.setup.stage === 'review' && currentView === 'review', appData.setup.programmes.map(p => p.status + ':' + (p.error || '')).join(', '));
+    ok('Nothing live before review', appData.org.name === 'Sample Development Agency');
+    // Edit during review, then accept
+    const p0 = appData.setup.programmes[0], ind = p0.fw.indicators[0];
+    CHANGES['rv-ind']({dataset:{pk:p0.key, id:ind.id, f:'target'}, value:'77', classList:{toggle(){}}});
     ACTIONS['rv-accept']();
-    ok('Accepted framework is live', appData.fw.title.startsWith('Mock extraction') && currentView === 'dashboard' && !appData.draft, appData.fw.title);
-    ok('Illustrative results generated', appData.results.length > 0, `${appData.results.length} results`);
-    ok('Audit trail recorded import and acceptance', appData.log.filter(e => /imported|accepted/.test(e.text)).length >= 2);
-    ok('Saved in this browser', (JSON.parse(localStorage.getItem(STORE_KEY)) || {}).fw.title === appData.fw.title);
+    const P = appData.programmes;
+    ok('Organisation is live with two programmes', appData.org.name === 'Kijani Water Trust' && P.length === 2 && currentView === 'dashboard');
+    ok('Sources recorded: logframe and AI draft', P[0].source.kind === 'upload' && P[1].source.kind === 'drafted', P.map(p => p.source.kind).join(','));
+    ok('Edit made on review kept and marked', P[0].fw.indicators[0].target === 77 && P[0].fw.indicators[0].prov === 'edited');
+    ok('Ids re-keyed to the live programmes', P.every(p => p.fw.indicators.every(i => i.id.startsWith(p.id + '-') && nodeById(i.node))));
+    ok('Brand colour applied', getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() === '#0b6e4f', getComputedStyle(document.documentElement).getPropertyValue('--brand'));
+    ok('Illustrative results generated for both', P.every(p => appData.results.some(r => r.prog === p.id)));
+    // Add a third programme later
+    appData.setup = {stage:'building', addOnly:true, org:appData.org, programmes:[su_newProg({name:'Shule Safi schools programme', description:'WASH in schools', mode:'draft'})], error:null};
+    await su_runAll();
+    ok('Added programme reaches review', appData.setup && appData.setup.stage === 'review');
+    ACTIONS['rv-accept']();
+    ok('Portfolio now has three programmes', appData.programmes.length === 3 && appData.programmes[2].id === 'P3' && appData.current === 'P3');
+    ok('Every screen draws for the new organisation', Object.keys(VIEW_RENDERERS).every(v => { try { VIEW_RENDERERS[v](v === 'indicator-detail' ? allInds()[0].id : v === 'result-detail' ? allInds()[0].node : ''); destroyCharts(); return true; } catch(e){ out.push('  ' + v + ': ' + e.message); return false; } }));
+    ok('Audit trail recorded the set-up', appData.log.some(e => /set up Kijani/.test(e.text)) && appData.log.some(e => /added Shule Safi/.test(e.text)));
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY));
+    ok('Saved in this browser (without file contents)', saved.org.name === 'Kijani Water Trust' && saved.programmes.length === 3 && !JSON.stringify(saved).includes('file_base64'));
   } catch(e){ out.push('FAIL exception — ' + (e && e.stack || e)); }
   const pre = document.createElement('pre'); pre.id = 'e2e'; pre.textContent = out.join('\n'); document.body.appendChild(pre);
-})();
-/* #e2e-review: stop at the review screen (for screenshots). */
-if (location.hash === '#e2e-review') (async () => {
-  await im_checkStatus();
-  const f = new File([await (await fetch('samples/sample_logframe.docx')).blob()], 'sample_logframe.docx');
-  await im_run(() => im_filePayload(f), 'sample_logframe.docx');
 })();
