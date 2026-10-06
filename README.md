@@ -8,7 +8,14 @@ A public Eval360 demonstration that sets itself up for **your programmes**. Two 
   profile, strategic goals and a list of programmes. For each programme, upload its logframe or let AI
   draft a realistic one.
 
-Strategic goals are optional and can be added later. Review everything, then Eval360 runs on it, in your brand colours: executive dashboard
+Strategic goals are optional and can be added later.
+
+Once set up, two AI features run on the organisation's own data through OpenAI:
+
+- **Ask Eval360** — ask questions in plain language ("Which programmes are off track, and why?") for the whole
+  organisation or one programme. Answers cite indicators and figures from the data only.
+- **AI report writer** — board summary, quarterly progress, donor report, performance analysis or data-quality
+  brief, for a chosen audience and length; print or save as PDF, download as Word, or copy. Review everything, then Eval360 runs on it, in your brand colours: executive dashboard
 across programmes, strategic goals, portfolio, a dashboard, logframe matrix, results chain and indicators
 per programme, a verification workflow, framework quality, an audit trail and printable reports.
 

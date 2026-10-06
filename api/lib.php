@@ -59,8 +59,8 @@ function lf_config(): array
         'mock'          => lf_env('AI_MOCK') === '1',
         'model'         => lf_env('OPENAI_MODEL', 'gpt-4.1-mini'),
         'endpoint'      => lf_env('OPENAI_ENDPOINT', 'https://api.openai.com/v1/responses'),
-        'per_ip_day'    => lf_int('AI_LIMIT_PER_IP_DAY', 25),
-        'total_day'     => lf_int('AI_LIMIT_TOTAL_DAY', 300),
+        'per_ip_day'    => lf_int('AI_LIMIT_PER_IP_DAY', 40),
+        'total_day'     => lf_int('AI_LIMIT_TOTAL_DAY', 500),
         'max_chars'     => lf_int('AI_MAX_TEXT_CHARS', 150000),
         'max_pdf_bytes' => lf_int('AI_MAX_PDF_MB', 8) * 1024 * 1024,
         'max_out'       => lf_int('AI_MAX_OUTPUT_TOKENS', 16000),
@@ -257,14 +257,37 @@ function lf_openai_extract(array $userContent): array
 function lf_openai_call(string $instructions, array $userContent, string $name, array $schema, string $kind, array $required, ?int $maxOut = null): array
 {
     $cfg = lf_config();
-    $payload = [
+    $json = lf_openai_post([
         'model' => $cfg['model'],
         'instructions' => $instructions,
         'input' => [['role' => 'user', 'content' => $userContent]],
         'text' => ['format' => ['type' => 'json_schema', 'name' => $name, 'strict' => true, 'schema' => $schema]],
         'max_output_tokens' => $maxOut ?? $cfg['max_out'],
         'store' => false,
-    ];
+    ], $kind);
+    return lf_parse_response($json, $required);
+}
+/** Free-text answer (markdown) for a conversation: $messages = [['role' => 'user'|'assistant', 'content' => string], …]. */
+function lf_openai_text(string $instructions, array $messages, string $kind, int $maxOut): string
+{
+    $cfg = lf_config();
+    $json = lf_openai_post(['model' => $cfg['model'], 'instructions' => $instructions, 'input' => $messages, 'max_output_tokens' => $maxOut, 'store' => false], $kind);
+    if (($json['status'] ?? '') === 'incomplete' && ($json['incomplete_details']['reason'] ?? '') !== 'max_output_tokens') {
+        lf_fail('The AI stopped before finishing. Please try again.', 422, 'incomplete');
+    }
+    $text = '';
+    foreach ($json['output'] ?? [] as $item) foreach ($item['content'] ?? [] as $c) {
+        if (($c['type'] ?? '') === 'refusal') lf_fail('The AI declined to answer that.', 422, 'refusal');
+        if (($c['type'] ?? '') === 'output_text') $text .= $c['text'];
+    }
+    if ($text === '' && isset($json['output_text'])) $text = (string) $json['output_text'];
+    if (trim($text) === '') lf_fail('The AI returned an empty answer. Please try again.', 502, 'empty');
+    return trim($text);
+}
+/** POST to the Responses API; returns the decoded body or fails with a message safe to show (never the key). */
+function lf_openai_post(array $payload, string $kind): array
+{
+    $cfg = lf_config();
     $t0 = microtime(true);
     $ch = curl_init($cfg['endpoint']);
     curl_setopt_array($ch, [
@@ -289,7 +312,7 @@ function lf_openai_call(string $instructions, array $userContent, string $name, 
         lf_fail('Could not reach the AI service. Please try again in a minute.', 502, 'unreachable');
     }
     if (!$ok) {
-        // The provider's message can be shown; it never contains the key.
+        // The provider's message is logged; the visitor sees a plain explanation. Neither contains the key.
         $msg = is_array($json) ? (string) ($json['error']['message'] ?? 'unknown error') : 'unexpected response';
         $type = is_array($json) ? (string) ($json['error']['code'] ?? $json['error']['type'] ?? '') : '';
         error_log('[logframe] OpenAI HTTP ' . $code . ' ' . $type . ': ' . substr($msg, 0, 300) . ($cerr ? ' curl: ' . $cerr : ''));
@@ -297,11 +320,11 @@ function lf_openai_call(string $instructions, array $userContent, string $name, 
             $code === 401 => 'The AI service rejected the server\'s credentials. The site owner needs to check the API key.',
             $code === 429 => 'The AI service is busy or the account has run out of credit. Try again shortly.',
             $code === 400 && stripos($msg, 'file') !== false => 'The AI service could not read this file. Try saving it as PDF, or paste the text instead.',
-            default => 'The AI service returned an error (' . $code . '). Try again, or paste the text instead of uploading.',
+            default => 'The AI service returned an error (' . $code . '). Please try again.',
         };
         lf_fail($public, 502, 'provider_' . $code);
     }
-    return lf_parse_response($json, $required);
+    return $json;
 }
 
 /* Pull the structured JSON out of a Responses API body. */

@@ -27,6 +27,9 @@ api/lib_org.php              organisation-profile schema, drafting prompt, mocks
 api/extract.php              POST — logframe document in, framework out
 api/profile.php              POST — name + website (+ description) in, profile + pages + brand out
 api/draft.php                POST — organisation + programme in, drafted framework out
+api/lib_ai.php               Ask Eval360 and report-writer prompts, report schema, mocks, context limits
+api/ask.php                  POST — question + history + organisation data in, markdown answer out
+api/report.php               POST — report type, audience, length + organisation data in, structured report out
 api/status.php               GET  — is AI on, requests left today (never the key)
 samples/                     sample logframe as CSV, DOCX, PDF — for visitors to try an upload
 tests/e2e.js                 end-to-end harness, injected only by scripts/e2e.sh — never shipped
@@ -86,6 +89,17 @@ outcome-level indicators of the programmes linked to them.
   exists for the local e2e test only and must never be set on a server.
 - `AI_MOCK=1` returns a fixed extraction without calling OpenAI — for local testing.
 - Usage log has tokens and timings only, never content.
+
+## Ask Eval360 and the AI report writer
+
+- The browser builds the data the AI sees with `aiContext(scope)`: organisation, goals, and per programme the
+  indicators (baseline, target, latest verified, expected, status, verification), gaps, risks, illustrative
+  budget and reach, a six-quarter trend. Nothing else. Scope = whole organisation or one programme.
+- Server prompts (`lib_ai.php`) require answers from that data only, never invented figures, and treat the
+  data (wrapped in `<eval360_data>`) strictly as data. Illustrative and AI-drafted content is named as such.
+- Answers are markdown rendered by `mdToHtml()`: escape first, then structure only (headings, bold, lists,
+  tables) — no links, no raw HTML. Reports are a strict JSON schema rendered with `esc()` everywhere.
+- Conversation (last 40 messages) and reports (last 12) persist in the browser; a new organisation starts fresh.
 
 ## Front-end rules (as the other demos)
 

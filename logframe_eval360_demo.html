@@ -696,6 +696,33 @@ button.mini:hover{border-color:var(--brand)}
 .swatch-pick{width:30px;height:30px;border-radius:8px;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
 .swatch-pick.on{border-color:var(--ink)}
 @media (max-width:760px){ .prow{grid-template-columns:1fr} .wiz-card{padding:18px} }
+
+/* ═══ ASK EVAL360 + AI REPORTS ══════════════════════════════════════════════ */
+.chat{flex:1;display:flex;flex-direction:column;gap:12px;padding:16px;overflow:auto;max-height:62vh}
+.chat-empty{margin:auto;text-align:center;color:var(--ink-mute);display:flex;flex-direction:column;gap:6px;align-items:center;padding:40px 10px}
+.chat-empty i{font-size:30px;color:var(--brand)} .chat-empty b{color:var(--ink);font:600 16px 'Fraunces',serif}
+.msg{max-width:88%;font-size:13px;line-height:1.6}
+.msg.user{align-self:flex-end;background:var(--brand);color:#fff;border-radius:14px 14px 3px 14px;padding:9px 14px;white-space:pre-wrap}
+.msg.ai{align-self:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:14px 14px 14px 3px;padding:10px 14px;max-width:96%}
+.msg.err{color:var(--bad)}
+.msg-meta{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:10.5px;color:var(--ink-mute)}
+.md p{margin:0 0 8px} .md p:last-child{margin-bottom:0} .md ul,.md ol{margin:0 0 8px;padding-left:20px} .md li{margin-bottom:3px}
+.md h4{font:600 14px 'Fraunces',serif;margin:10px 0 4px} .md code{font:12px 'JetBrains Mono',monospace;background:var(--muted);padding:1px 4px;border-radius:4px}
+.md .tbl-scroll{margin:6px 0 10px} .md table.dt{font-size:12px;background:var(--card)}
+.ask-form{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line-soft);align-items:flex-end}
+.ask-form textarea{flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;font-size:13px;resize:vertical;min-height:44px;color:var(--ink);background:var(--card)}
+.sug{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 11px;margin-bottom:6px;font:inherit;font-size:12.5px;color:var(--ink-soft);cursor:pointer}
+.sug:hover{border-color:var(--brand);color:var(--brand)}
+.rtype{display:flex;flex-direction:column;gap:3px;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:10px 12px;cursor:pointer;font:inherit;color:var(--ink)}
+.rtype i{color:var(--brand);font-size:17px} .rtype b{font-size:12.5px} .rtype span{font-size:11px;color:var(--ink-mute);line-height:1.45}
+.rtype.on{border-color:var(--brand);box-shadow:inset 0 0 0 1px var(--brand);background:var(--brand-soft)}
+.rep-doc{max-width:860px;margin-top:12px;font-size:13.5px;line-height:1.65}
+.rep-doc h1{font:700 24px/1.25 'Fraunces',serif;margin:0 0 4px} .rep-doc h2{font:600 17px 'Fraunces',serif;margin:20px 0 6px}
+.rep-doc .sub{color:var(--ink-mute);margin-bottom:12px} .rep-doc p{margin:0 0 9px}
+.rep-doc .keys{border-left:4px solid var(--brand);background:var(--brand-soft);padding:10px 16px;border-radius:0 10px 10px 0;margin:14px 0}
+.rep-doc .kh{font:700 10px 'Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);margin-bottom:4px}
+.rep-doc .cav{font-size:11.5px;color:var(--ink-mute);border-top:1px solid var(--line);margin-top:18px;padding-top:10px}
+@media (max-width:760px){ .msg{max-width:100%} .chat{max-height:none} }
 </style>
 </head>
 <body>
@@ -726,7 +753,8 @@ button.mini:hover{border-color:var(--brand)}
         <div class="tb-title" id="tb-title">Dashboard</div>
       </div>
       <div class="tb-tools">
-        <span class="chip grey" id="ai-pill" title="AI import status"><i class="bi bi-stars"></i> AI import</span>
+        <span class="chip grey" id="ai-pill" title="AI status"><i class="bi bi-stars"></i> AI</span>
+        <button class="btn btn-sm" data-action="go" data-view="ask"><i class="bi bi-chat-dots"></i> <span class="hide-sm">Ask Eval360</span></button>
         <button class="btn btn-sm btn-primary" data-action="go" data-view="setup"><i class="bi bi-stars"></i> <span class="hide-sm">Set up / import</span></button>
       </div>
     </header>
@@ -826,6 +854,9 @@ const NAV = [
     {key:'profile',    icon:'bi-building',          label:'Organisation profile'},
     {key:'strategy',   icon:'bi-bullseye',          label:'Strategic goals'},
     {key:'portfolio',  icon:'bi-grid-1x2',          label:'Programme portfolio'}]},
+  {group:'Ask & report', items:[
+    {key:'ask',        icon:'bi-chat-dots',         label:'Ask Eval360'},
+    {key:'aireports',  icon:'bi-magic',             label:'AI report writer'}]},
   {group:'Programme', prog:true, items:[
     {key:'programme',  icon:'bi-clipboard-data',    label:'Programme dashboard'},
     {key:'matrix',     icon:'bi-table',             label:'Logframe matrix'},
@@ -1256,7 +1287,8 @@ function saveState(){
     // File contents are never stored: uploads are dropped, payloads cleared (pasted text is kept so it can be rebuilt).
     const setup = appData.setup ? Object.assign({}, appData.setup, {uploads:[], programmes:(appData.setup.programmes || []).map(p => Object.assign({}, p, {payload:null}))}) : null;
     localStorage.setItem(STORE_KEY, JSON.stringify({v:2, org:appData.org, programmes:appData.programmes.map(p => Object.assign({}, p, {quarters:undefined})),
-      current:appData.current, overrides:appData.overrides, log:appData.log.filter(e => e.live).slice(0, 300), settings:appData.settings, setup}));
+      current:appData.current, overrides:appData.overrides, log:appData.log.filter(e => e.live).slice(0, 300), settings:appData.settings, setup,
+      chat:(appData.chat || []).slice(-40), aiReports:(appData.aiReports || []).slice(-12), aiScope:appData.aiScope || 'org'}));
   } catch(e){ /* private window or storage full — the session still works */ }
 }
 function loadState(){
@@ -1264,7 +1296,7 @@ function loadState(){
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (!s || s.v !== 2 || !s.org || !Array.isArray(s.programmes) || !s.programmes.length) return false;
     Object.assign(appData, {org:s.org, programmes:s.programmes, current:s.current, overrides:s.overrides || {}, log:s.log || [],
-      settings:Object.assign(appData.settings, s.settings || {}), setup:s.setup || null});
+      settings:Object.assign(appData.settings, s.settings || {}), setup:s.setup || null, chat:Array.isArray(s.chat) ? s.chat : [], aiReports:Array.isArray(s.aiReports) ? s.aiReports : [], aiScope:s.aiScope || 'org'});
     return true;
   } catch(e){ return false; }
 }
@@ -1273,6 +1305,7 @@ function clearState(){ try { localStorage.removeItem(STORE_KEY); } catch(e){} }
 /* Make an organisation and its programmes the live set. */
 function adoptOrganisation(org, programmes){
   appData.org = org; appData.programmes = programmes; appData.current = programmes[0] ? programmes[0].id : null; appData.overrides = {};
+  appData.chat = []; appData.aiReports = []; appData.aiScope = 'org';   // a new organisation starts a new conversation
   generateResults(); applyBrand();
 }
 const isSample = () => !!(appData.org && appData.org.source && appData.org.source.kind === 'sample');
@@ -2122,7 +2155,7 @@ VIEW_RENDERERS['dashboard'] = () => {
     : `<p class="small" style="margin:0 0 10px;line-height:1.6">No strategic goals yet. Add your organisation’s goals and link programmes to them to see how each programme contributes to strategy.</p>
        <button class="btn btn-sm" data-action="st-goal" data-i="-1"><i class="bi bi-plus-lg"></i> Add a strategic goal</button>`;
   return pageHead(`${esc(o.name)} — performance overview`, `${orgSrcLine()} · frameworks: ${P.filter(p => p.source.kind === 'upload').length} from logframes, ${P.filter(p => p.source.kind === 'drafted').length} AI-drafted · progress ${demoBadge('illustrative')}`,
-      `<button class="btn btn-sm" data-action="rp-print" data-kind="board"><i class="bi bi-file-earmark-text"></i> Board report</button>`)
+      `<button class="btn btn-sm" data-action="ask-prog" data-prog="org"><i class="bi bi-chat-dots"></i> Ask Eval360</button> <button class="btn btn-sm" data-action="go" data-view="aireports"><i class="bi bi-magic"></i> AI report</button> <button class="btn btn-sm" data-action="rp-print" data-kind="board"><i class="bi bi-file-earmark-text"></i> Board report</button>`)
     + sampleBanner() + hero
     + `<div class="kpi-row">
         ${kpi({label:'Programmes', value:P.length, sub:`${P.filter(p => p.source.kind === 'upload').length} with your logframe`, view:'portfolio'})}
@@ -2281,7 +2314,7 @@ VIEW_RENDERERS['programme'] = () => {
       ${progressBar(pi || 0, rag3(pi))}
       <div class="small muted" style="margin-top:6px">${plural(S.length, 'indicator')} · ${cc.on} on track · ${cc.attention} attention · ${cc.off} off</div></button>`; };
   const off = L.filter(i => indStatus(i).key === 'off');
-  return progHead(p, 'Programme dashboard', `<button class="btn btn-sm" data-action="rp-print" data-kind="performance"><i class="bi bi-printer"></i> Programme report</button>`)
+  return progHead(p, 'Programme dashboard', `<button class="btn btn-sm" data-action="ask-prog" data-prog="${esc(p.id)}"><i class="bi bi-chat-dots"></i> Ask about this programme</button> <button class="btn btn-sm" data-action="rp-print" data-kind="performance"><i class="bi bi-printer"></i> Programme report</button>`)
     + draftBanner(p)
     + (fw.timelineShifted ? banner('info', 'bi-hourglass-split', 'This programme has completed fewer than three quarters, so the illustrative tracking uses the last six quarters to show how monitoring will look.') : '')
     + `<div class="kpi-row">
@@ -2621,6 +2654,223 @@ VIEW_RENDERERS['about'] = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   24. ASK EVAL360 AND THE AI REPORT WRITER — real OpenAI calls through the
+   server proxy (api/ask.php, api/report.php). The browser sends the
+   organisation's own data as JSON; the AI answers only from it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const AI_SCOPE = () => appData.aiScope && (appData.aiScope === 'org' || progById(appData.aiScope)) ? appData.aiScope : 'org';
+const srcLabel = p => p.source.kind === 'drafted' ? 'AI-drafted proposal' : p.source.kind === 'sample' ? 'fictional sample' : p.source.pasted ? 'pasted logframe' : 'uploaded logframe';
+
+/* The data the AI sees: everything a manager would look at, nothing else. */
+function aiContext(scope = AI_SCOPE()){
+  const o = appData.org, lq = lastCompletedQ();
+  const P = scope === 'org' ? appData.programmes : appData.programmes.filter(p => p.id === scope);
+  const progCtx = p => {
+    const L = p.fw.indicators, c = statusCounts(L), b = p.budget;
+    return {short_name:p.short, name:p.name, framework_source:srcLabel(p), location:p.location || null, target_group:p.targetGroup || null,
+      period:{start:p.fw.periodStart, end:p.fw.periodEnd}, strategic_goals:p.goalCodes,
+      performance_index:progIndex(p), status_counts:{on_track:c.on, needs_attention:c.attention, off_track:c.off, no_target:c.notarget, no_verified_result:c.none},
+      trend:p.quarters.slice(-6).map(q => ({quarter:q.label, performance_index:indexAt(q.id, L)})),
+      budget_illustrative:{currency:b.currency, total:b.total, spent:b.spent, spent_pct:Math.round(b.spent / b.total * 100), time_elapsed_pct:Math.round(b.elapsed)},
+      people_reached_illustrative:reachOf(p),
+      indicators:L.map(i => { const n = nodeById(i.node), r = latestOfficial(i), eb = effectiveBaseline(i), lastR = indResults(i).slice(-1)[0];
+        return {code:i.code, name:i.name, level:n.level, result_code:n.code, result:n.statement.slice(0, 160), unit:i.unit || null, direction:i.dir,
+          baseline:i.baseline, baseline_assumed_for_illustration:eb.assumed ? eb.v : undefined, target:i.target, target_year:i.targetYear || null,
+          latest_verified:r ? r.value : null, latest_quarter:r ? r.label : null, expected_by_now:r ? r.expected : null,
+          achievement_pct:indAchievement(i) === null ? null : Math.round(indAchievement(i)), status:indStatus(i).label,
+          current_quarter_verification:lastR && lastR.quarter === lq.id ? lastR.state : null, means_of_verification:i.mov || null}; }),
+      framework_gaps:qualityIssues(p.fw).filter(q => q.sev !== 'info').map(q => q.text).slice(0, 25),
+      risks:p.fw.risks, assumptions:p.fw.assumptions.concat(p.fw.nodes.flatMap(n => n.assumptions)).slice(0, 15)};
+  };
+  const lqR = appData.results.filter(r => r.quarter === lq.id && P.some(p => p.id === r.prog));
+  return {period:lq.label, scope:scope === 'org' ? 'whole organisation' : `programme ${progById(scope).short}`, tolerance_pct:appData.settings.tolerance,
+    data_notes:['Progress, budget and people-reached figures are ILLUSTRATIVE — generated by the demonstration, not the organisation’s real results.',
+      'Results frameworks come from the organisation’s logframes unless framework_source says "AI-drafted proposal".',
+      'Only verified results count towards status; unverified ones are listed under current_quarter_verification.'],
+    organisation:{name:o.name, type:o.type || null, sector:o.sector || null, country:o.country || null, mission:o.mission || null, vision:o.vision || null, summary:o.summary || null,
+      profile_source:o.source.kind, performance_index:perfIndex(),
+      strategic_goals:o.goals.map(g => ({code:g.code, statement:g.statement, basis:g.basis, programmes:goalProgs(g.code).map(p => p.short), performance_index:goalIndex(g.code)})),
+      facts_from_website:o.facts.slice(0, 12).map(f => f.statement)},
+    programmes:P.map(progCtx),
+    verification_backlog:{draft:lqR.filter(r => r.state === 'Draft').length, submitted:lqR.filter(r => r.state === 'Submitted').length, under_review:lqR.filter(r => r.state === 'Under Review').length}};
+}
+
+/* ── Markdown → safe HTML. Everything is escaped first; only structure is added. No links, no raw HTML. ── */
+function mdInline(s){
+  return esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<i>$2</i>');
+}
+function mdToHtml(md){
+  const L = String(md || '').replace(/\r/g, '').split('\n'), out = [];
+  let i = 0, para = [];
+  const flush = () => { if (para.length){ out.push(`<p>${mdInline(para.join(' '))}</p>`); para = []; } };
+  const cells = l => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+  while (i < L.length){
+    const l = L[i];
+    if (!l.trim()){ flush(); i++; continue; }
+    let m;
+    if ((m = l.match(/^\s*(#{1,4})\s+(.*)$/))){ flush(); out.push(`<h4 class="md-h${m[1].length}">${mdInline(m[2])}</h4>`); i++; continue; }
+    if (/^\s*\|/.test(l) && L[i + 1] && /^\s*\|?\s*:?-{2,}/.test(L[i + 1])){
+      flush(); const head = cells(l); i += 2; const rows = [];
+      while (i < L.length && /^\s*\|/.test(L[i])){ rows.push(cells(L[i])); i++; }
+      out.push(`<div class="tbl-scroll"><table class="dt"><thead><tr>${head.map(h => `<th>${mdInline(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${head.map((h, k) => `<td>${mdInline(r[k] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      continue;
+    }
+    if (/^\s*([-*•])\s+/.test(l) || /^\s*\d+[.)]\s+/.test(l)){
+      flush(); const ordered = /^\s*\d+[.)]\s+/.test(l), items = [];
+      while (i < L.length && (ordered ? /^\s*\d+[.)]\s+/ : /^\s*([-*•])\s+/).test(L[i])){ items.push(L[i].replace(ordered ? /^\s*\d+[.)]\s+/ : /^\s*([-*•])\s+/, '')); i++; }
+      out.push(`<${ordered ? 'ol' : 'ul'}>${items.map(t => `<li>${mdInline(t)}</li>`).join('')}</${ordered ? 'ol' : 'ul'}>`);
+      continue;
+    }
+    para.push(l.trim()); i++;
+  }
+  flush();
+  return `<div class="md">${out.join('')}</div>`;
+}
+
+/* ═══ Ask Eval360 ═══════════════════════════════════════════════════════════ */
+const ASK_SUGGEST = {
+  org:['Which programmes are off track, and why?', 'Summarise our performance for the board in five bullets.', 'What should management prioritise this quarter?',
+       'Which indicators have no baseline or target?', 'How does each programme contribute to our strategic goals?', 'Is spending in line with progress?'],
+  prog:['How is this programme performing against its logframe?', 'Which indicators are off track, and what could explain it?', 'Which results are still awaiting verification?',
+        'What are the biggest risks to the outcomes?', 'Draft three talking points for the programme review meeting.']
+};
+let askBusy = false;
+VIEW_RENDERERS['ask'] = () => {
+  const ai = appData.ai, scope = AI_SCOPE(), chat = appData.chat || [], ctx = aiContext(scope);
+  const size = JSON.stringify(ctx).length, nInd = ctx.programmes.reduce((t, p) => t + p.indicators.length, 0);
+  const sugg = ASK_SUGGEST[scope === 'org' ? 'org' : 'prog'];
+  const bubble = m => m.role === 'user' ? `<div class="msg user">${esc(m.content)}</div>`
+    : m.role === 'error' ? `<div class="msg ai err"><i class="bi bi-exclamation-octagon" style="color:var(--bad)"></i> ${esc(m.content)}</div>`
+    : `<div class="msg ai">${mdToHtml(m.content)}<div class="msg-meta">${aiBadge(`AI · ${m.model || ''}`)} ${demoBadge('based on illustrative figures')} <span>${esc(m.scope || '')}</span></div></div>`;
+  return pageHead('Ask Eval360', `Ask anything about ${esc(appData.org.name)}’s programmes, results and data. Answers come from your data only — powered by OpenAI.`,
+      chat.length ? `<button class="btn btn-sm btn-ghost" data-action="ask-clear"><i class="bi bi-trash3"></i> Clear conversation</button>` : '')
+    + (!ai.checked ? '' : !ai.available ? banner('warn', 'bi-exclamation-triangle', ai.offline ? 'Ask Eval360 works on the hosted demo, not from a file opened on your computer.' : 'AI is not configured on this server yet.') : '')
+    + `<div class="grid-main"><div class="card" style="display:flex;flex-direction:column;min-height:520px">
+        <div class="chat" id="ask-chat">${chat.length ? chat.map(bubble).join('') : `<div class="chat-empty"><i class="bi bi-chat-dots"></i><b>Ask a question about your organisation</b>
+            <span>For example: “${esc(sugg[0])}”</span></div>`}
+          ${askBusy ? '<div class="msg ai"><div class="busy" style="padding:4px;background:none"><div class="spin" style="width:18px;height:18px;border-width:2px"></div><span class="small">Reading your data and writing an answer…</span></div></div>' : ''}</div>
+        <form class="ask-form" data-action="ask-form"><textarea id="ask-q" name="q" rows="2" placeholder="Ask about performance, indicators, risks, verification, strategy…" ${askBusy || !ai.available ? 'disabled' : ''}></textarea>
+          <button class="btn btn-primary" type="submit" ${askBusy || !ai.available ? 'disabled' : ''}><i class="bi bi-send"></i> Ask</button></form></div>
+      <div class="stack">
+        ${card('Scope', `<select class="sel" style="max-width:none;width:100%" data-action="ai-scope" aria-label="Scope"><option value="org"${scope === 'org' ? ' selected' : ''}>Whole organisation — ${plural(appData.programmes.length, 'programme')}</option>
+            ${appData.programmes.map(p => `<option value="${esc(p.id)}"${scope === p.id ? ' selected' : ''}>${esc(p.short)} — ${esc(p.name)}</option>`).join('')}</select>
+          <div class="small muted" style="margin-top:8px">The assistant sees ${plural(ctx.programmes.length, 'programme')}, ${plural(nInd, 'indicator')}, their status, verification, gaps, risks and illustrative budgets (${num(Math.round(size / 1000))} KB). Nothing else.</div>`)}
+        ${card('Try asking', sugg.map(q => `<button class="sug" data-action="ask-quick" data-q="${esc(q)}" ${askBusy || !ai.available ? 'disabled' : ''}>${esc(q)}</button>`).join(''))}
+        ${card('Good to know', `<ul class="small" style="margin:0;padding-left:18px;line-height:1.65"><li>Answers are AI-written from your data — check figures before you rely on them.</li>
+            <li>Progress, budget and reach figures in this demo are illustrative.</li><li>Your question and the data above are sent to OpenAI; nothing is stored on this server. The conversation is kept in this browser.</li>
+            ${ai.remaining !== null && ai.remaining !== undefined && ai.available ? `<li>${plural(ai.remaining, 'AI request')} left today.</li>` : ''}</ul>`)}</div></div>`;
+};
+async function askSend(question){
+  question = String(question || '').trim();
+  if (question.length < 3 || askBusy) return;
+  appData.chat = appData.chat || [];
+  const scope = AI_SCOPE(), scopeLabel = scope === 'org' ? 'Whole organisation' : progById(scope).short;
+  const history = appData.chat.filter(m => m.role !== 'error').slice(-10).map(m => ({role:m.role, content:m.content}));
+  appData.chat.push({role:'user', content:question, at:nowStamp(), scope:scopeLabel});
+  askBusy = true; if (currentView === 'ask') redraw(); askScroll();
+  try {
+    const d = await apiPost('ask.php', {question, history, context:aiContext(scope)});
+    appData.chat.push({role:'assistant', content:d.answer, model:d.meta.model, at:nowStamp(), scope:scopeLabel});
+    addLog(`asked Eval360: “${question.slice(0, 80)}${question.length > 80 ? '…' : ''}”`, {view:'ask', meta:''}, 'bi-chat-dots');
+  } catch(e){ appData.chat.push({role:'error', content:e.message, at:nowStamp()}); }
+  askBusy = false; appData.chat = appData.chat.slice(-40); saveState();
+  if (currentView === 'ask') redraw();
+  askScroll();
+}
+const askScroll = () => setTimeout(() => { const c = document.getElementById('ask-chat'); if (c) c.scrollTop = c.scrollHeight; }, 30);
+SUBMITS['ask-form'] = (f, fd) => askSend(fd.get('q'));
+ACTIONS['ask-quick'] = t => { if (currentView !== 'ask') showView('ask'); askSend(t.dataset.q); };
+ACTIONS['ask-prog'] = t => { appData.aiScope = t.dataset.prog || 'org'; saveState(); showView('ask'); };
+CHANGES['ai-scope'] = t => { appData.aiScope = t.value; saveState(); redraw(); };
+ACTIONS['ask-clear'] = () => { if (!confirm('Clear the conversation?')) return; appData.chat = []; saveState(); redraw(); };
+document.addEventListener('keydown', e => {   // Enter sends, Shift+Enter is a new line
+  if (e.key === 'Enter' && !e.shiftKey && e.target && e.target.id === 'ask-q'){ e.preventDefault(); askSend(e.target.value); }
+});
+
+/* ═══ AI report writer ══════════════════════════════════════════════════════ */
+const AI_REPORT_TYPES = [
+  {id:'board', icon:'bi-easel2', name:'Board / executive summary', desc:'Overall performance, programmes at a glance, what is off track, decisions needed.'},
+  {id:'quarterly', icon:'bi-calendar3', name:'Quarterly progress report', desc:'Progress by outcome and output, results against targets, challenges, next quarter.'},
+  {id:'donor', icon:'bi-bank', name:'Donor progress report', desc:'Results against the logframe, narrative by outcome, indicator table, risks, lessons.'},
+  {id:'analysis', icon:'bi-graph-up-arrow', name:'Performance analysis', desc:'Patterns across indicators and programmes, likely causes, prioritised actions.'},
+  {id:'quality', icon:'bi-clipboard-check', name:'Data quality brief', desc:'Missing baselines, targets and verification, backlog, what to fix first.'}
+];
+const AUDIENCES = ['Board', 'Donor', 'Senior management', 'Programme team', 'Government partner'];
+let repBusy = false;
+const rw = () => appData.rw || (appData.rw = {type:'board', audience:'Board', length:'standard', instructions:'', open:null});
+function aiReportHtml(x, forDoc){
+  const r = x.report, cell = v => esc(String(v ?? ''));
+  return `<div class="${forDoc ? '' : 'rep-doc'}">
+    <h1>${esc(r.title)}</h1><div class="sub">${esc(r.subtitle)}</div>
+    ${r.key_messages.length ? `<div class="keys"><div class="kh">Key messages</div><ul>${r.key_messages.map(k => `<li>${esc(k)}</li>`).join('')}</ul></div>` : ''}
+    ${r.sections.map(s => `<h2>${esc(s.heading)}</h2>${s.paragraphs.map(p => `<p>${esc(p)}</p>`).join('')}${s.bullets.length ? `<ul>${s.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
+      ${s.table_columns.length ? `<table class="${forDoc ? '' : 'dt'}"><thead><tr>${s.table_columns.map(c => `<th>${cell(c)}</th>`).join('')}</tr></thead><tbody>${s.table_rows.map(row => `<tr>${s.table_columns.map((c, k) => `<td>${cell(row[k])}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}`).join('')}
+    ${r.recommendations.length ? `<h2>Recommendations</h2><table class="${forDoc ? '' : 'dt'}"><thead><tr><th>Priority</th><th>Action</th><th>Owner</th><th>Why</th></tr></thead><tbody>${r.recommendations.map(m => `<tr><td>${cell(m.priority)}</td><td>${cell(m.action)}</td><td>${cell(m.owner)}</td><td>${cell(m.rationale)}</td></tr>`).join('')}</tbody></table>` : ''}
+    <div class="cav"><b>Caveats.</b> ${r.caveats.map(esc).join(' ')} AI-written draft (${esc(x.model)}, ${esc(x.at)}) from the organisation’s Eval360 data — check before sharing.</div></div>`;
+}
+VIEW_RENDERERS['aireports'] = () => {
+  const ai = appData.ai, st = rw(), list = appData.aiReports || [], scope = AI_SCOPE();
+  const open = list.find(x => x.id === st.open) || null;
+  return pageHead('AI report writer', `OpenAI drafts the report from ${esc(appData.org.name)}’s data — every figure comes from your frameworks and results.`)
+    + (!ai.checked ? '' : !ai.available ? banner('warn', 'bi-exclamation-triangle', ai.offline ? 'The report writer works on the hosted demo, not from a file opened on your computer.' : 'AI is not configured on this server yet.') : '')
+    + `<div class="grid-main mb"><div class="card"><div class="card-body">
+        <div class="m-code" style="margin-bottom:8px">REPORT</div>
+        <div class="card-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">${AI_REPORT_TYPES.map(t => `<button class="rtype${st.type === t.id ? ' on' : ''}" data-action="rw-type" data-t="${t.id}">
+            <i class="bi ${t.icon}"></i><b>${esc(t.name)}</b><span>${esc(t.desc)}</span></button>`).join('')}</div>
+        <div class="form-grid" style="margin-top:14px">
+          <div class="fld"><label>Scope</label><select data-action="ai-scope"><option value="org"${scope === 'org' ? ' selected' : ''}>Whole organisation</option>${appData.programmes.map(p => `<option value="${esc(p.id)}"${scope === p.id ? ' selected' : ''}>${esc(p.short)} — ${esc(p.name)}</option>`).join('')}</select></div>
+          <div class="fld"><label>Audience</label><select data-action="rw-aud">${AUDIENCES.map(a => `<option${st.audience === a ? ' selected' : ''}>${esc(a)}</option>`).join('')}</select></div>
+          <div class="fld full"><label>Length</label><div class="choice">${[['short','Short — 1 page'], ['standard','Standard — 2 pages'], ['detailed','Detailed — 3 to 4 pages']].map(([k, l]) => `<button class="${st.length === k ? 'on' : ''}" data-action="rw-len" data-l="${k}">${esc(l)}</button>`).join('')}</div></div>
+          <div class="fld full"><label for="rw-x">Anything to emphasise? <span class="muted">(optional)</span></label><textarea id="rw-x" data-action="rw-x" rows="2" placeholder="e.g. focus on women’s participation; mention the drought">${esc(st.instructions)}</textarea></div></div>
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${repBusy ? '<div class="busy" style="flex:1"><div class="spin"></div><div><b>Writing the report</b><div class="small">Reading your data and drafting — usually 20 to 60 seconds.</div></div></div>'
+          : `<button class="btn btn-primary" data-action="rw-go" ${ai.available ? '' : 'disabled'}><i class="bi bi-magic"></i> Write the report</button><span class="small muted">One AI request${ai.remaining !== null && ai.remaining !== undefined && ai.available ? ` · ${plural(ai.remaining, 'request')} left today` : ''}</span>`}</div></div></div>
+      ${card('Your AI reports', list.length ? list.slice().reverse().map(x => `<div class="brow" style="padding:8px 0"><i class="bi bi-file-earmark-text" style="color:var(--brand)"></i>
+          <button class="linkish" style="flex:1;text-align:left;border:0" data-action="rw-open" data-id="${esc(x.id)}">${esc(x.report.title)}<span class="small muted" style="display:block">${esc(x.typeName)} · ${esc(x.scopeLabel)} · ${esc(x.at)}</span></button>
+          <button class="x btn btn-sm btn-ghost" data-action="rw-del" data-id="${esc(x.id)}" aria-label="Delete"><i class="bi bi-trash3"></i></button></div>`).join('') : '<div class="small muted">Reports you generate appear here, kept in this browser.</div>', {bodyStyle:'padding-top:4px'})}</div>`
+    + (open ? `<div class="card"><div class="card-head"><h3>${esc(open.report.title)}</h3><div class="ch-sub" style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" data-action="rw-print" data-id="${esc(open.id)}"><i class="bi bi-printer"></i> Print / PDF</button>
+          <button class="btn btn-sm" data-action="rw-word" data-id="${esc(open.id)}"><i class="bi bi-file-earmark-word"></i> Word</button>
+          <button class="btn btn-sm" data-action="rw-copy" data-id="${esc(open.id)}"><i class="bi bi-clipboard"></i> Copy text</button></div></div>
+        <div class="card-body">${aiBadge(`AI-written draft · ${open.model}`)} ${demoBadge('based on illustrative figures')}${aiReportHtml(open, false)}</div></div>` : '');
+};
+ACTIONS['rw-type'] = t => { rw().type = t.dataset.t; const a = {board:'Board', donor:'Donor', quarterly:'Senior management', analysis:'Senior management', quality:'Programme team'}[t.dataset.t]; if (a) rw().audience = a; redraw(); };
+ACTIONS['rw-len'] = t => { rw().length = t.dataset.l; redraw(); };
+CHANGES['rw-aud'] = t => { rw().audience = t.value; };
+CHANGES['rw-x'] = t => { rw().instructions = t.value.trim(); };
+ACTIONS['rw-go'] = async () => {
+  if (repBusy) return;
+  const st = rw(), scope = AI_SCOPE(), el = document.getElementById('rw-x'); if (el) st.instructions = el.value.trim();
+  repBusy = true; redraw();
+  try {
+    const d = await apiPost('report.php', {type:st.type, audience:st.audience, length:st.length, instructions:st.instructions, context:aiContext(scope)});
+    const x = {id:`AR${Date.now().toString(36)}`, type:st.type, typeName:AI_REPORT_TYPES.find(t => t.id === st.type).name, audience:st.audience, length:st.length,
+      scopeLabel:scope === 'org' ? appData.org.name : progById(scope).name, report:d.report, model:d.meta.model, at:nowStamp()};
+    appData.aiReports = (appData.aiReports || []).concat([x]).slice(-12); st.open = x.id; saveState();
+    addLog(`generated an AI report: ${x.report.title}`, {view:'aireports', meta:''}, 'bi-magic', {old:null, new:x.typeName, reason:`${x.audience} · ${x.length}`});
+    toast('Report written — review it before sharing.', 'ok');
+  } catch(e){ toast(e.message, 'warn'); }
+  repBusy = false; if (currentView === 'aireports') redraw();
+};
+const rw_get = id => (appData.aiReports || []).find(x => x.id === id);
+ACTIONS['rw-open'] = t => { rw().open = t.dataset.id; redraw(); };
+ACTIONS['rw-del'] = t => { if (!confirm('Delete this report from this browser?')) return; appData.aiReports = (appData.aiReports || []).filter(x => x.id !== t.dataset.id); saveState(); redraw(); };
+const RW_DOC_CSS = `body{font:12pt/1.55 Calibri,Arial,sans-serif;color:#0f1c2a;margin:28px}h1{font:700 20pt Georgia,serif;margin:0 0 4px}h2{font:700 14pt Georgia,serif;margin:18px 0 6px}
+  .sub{color:#5a6878;margin-bottom:14px}.keys{border-left:4px solid #27466e;background:#f3f6fa;padding:8px 14px;margin:12px 0}.kh{font-weight:700;text-transform:uppercase;font-size:9pt;letter-spacing:.06em}
+  table{border-collapse:collapse;width:100%;margin:8px 0;font-size:10.5pt}th{background:#152a47;color:#fff;text-align:left;padding:5px 7px}td{border:1px solid #cfd7e0;padding:5px 7px;vertical-align:top}
+  .cav{font-size:9.5pt;color:#5a6878;border-top:1px solid #cfd7e0;margin-top:18px;padding-top:8px}.bar{padding:6px 0 12px}.bar button{font:600 13px Arial;padding:8px 14px;border-radius:6px;border:0;background:#27466e;color:#fff;cursor:pointer}
+  @media print{.bar{display:none}body{margin:14mm}}`;
+const rwDocument = (x, printable) => `<!doctype html><html><head><meta charset="utf-8"><title>${esc(x.report.title)}</title><style>${RW_DOC_CSS}</style></head><body>
+  ${printable ? '<div class="bar"><button onclick="window.print()">Print / Save as PDF</button></div>' : ''}${aiReportHtml(x, true)}</body></html>`;
+ACTIONS['rw-print'] = t => { const x = rw_get(t.dataset.id); if (!x) return;
+  const url = URL.createObjectURL(new Blob([rwDocument(x, true)], {type:'text/html'})); if (!window.open(url, '_blank')) toast('Allow pop-ups to open the report.', 'warn'); setTimeout(() => URL.revokeObjectURL(url), 60000); };
+ACTIONS['rw-word'] = t => { const x = rw_get(t.dataset.id); if (!x) return; downloadBlob(`${slugFile(x.report.title)}.doc`, 'application/msword', '﻿' + rwDocument(x, false)); };
+function rwText(x){ const r = x.report; return [r.title, r.subtitle, '', 'KEY MESSAGES', ...r.key_messages.map(k => '• ' + k), '',
+  ...r.sections.flatMap(s => [s.heading.toUpperCase(), ...s.paragraphs, ...s.bullets.map(b => '• ' + b), ...(s.table_columns.length ? [s.table_columns.join(' | '), ...s.table_rows.map(row => row.join(' | '))] : []), '']),
+  'RECOMMENDATIONS', ...r.recommendations.map(m => `• [${m.priority}] ${m.action} — ${m.owner}. ${m.rationale}`), '', 'Caveats: ' + r.caveats.join(' ') + ' AI-written draft — check before sharing.'].join('\n'); }
+ACTIONS['rw-copy'] = async t => { const x = rw_get(t.dataset.id); if (!x) return;
+  try { await navigator.clipboard.writeText(rwText(x)); toast('Report copied as text.', 'ok'); } catch(e){ toast('Copy is not available in this browser — use Word or Print instead.', 'warn'); } };
+
+/* ═══════════════════════════════════════════════════════════════════════════
    30. ROUTER — one dispatcher: sidebar (with the programme switcher), topbar,
    renderer, charts.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -2822,7 +3072,21 @@ function selfTest(){
   appData.setup = {stage:'org', form:{name:'', website:'', country:'', description:''}, uploads:[{key:'u1', filename:H, payload:{kind:'text', chars:200}, error:null}, {key:'u2', filename:'b.pdf', payload:null, error:H}], lfOrg:H, programmes:[]};
   try { const h = VIEW_RENDERERS['setup'](''); if (BAD.test(h)) out.push('FAIL setup uploads: unescaped markup'); } catch(e){ out.push(`FAIL setup uploads: ${e.message}`); }
   appData.setup = null;
-  // 5 · Re-keying a reviewed framework keeps every link
+  // 5 · Ask Eval360 and AI reports: hostile model output must render inert
+  loadSample();
+  const ctx = aiContext('org');
+  check('AI context: whole organisation, all 34 indicators, under 90 KB', [ctx.programmes.length, ctx.programmes.reduce((t, p) => t + p.indicators.length, 0), JSON.stringify(ctx).length < 90000], [3, 34, true]);
+  check('AI context for one programme holds only that programme', aiContext('P2').programmes.map(p => p.short_name), ['YSEP']);
+  const md = mdToHtml('# Head\n**bold** and <img src=x onerror=alert(1)> [x](javascript:alert(1))\n\n| a | b |\n|---|---|\n| <script>alert(1)<\/script> | 2 |\n\n- one\n- two\n1. first');
+  check('Markdown rendered with structure but no live markup', [md.includes('<h4'), md.includes('<b>bold</b>'), md.includes('<table'), md.includes('<ul>'), md.includes('<ol>'), /<img|<script|href=/i.test(md)], [true, true, true, true, true, false]);
+  appData.chat = [{role:'user', content:H}, {role:'assistant', content:'**ok** ' + H + '\n| x | y |\n|---|---|\n| ' + H + ' | 1 |', model:H, scope:H}, {role:'error', content:H}];
+  const HR = {title:H, subtitle:H, key_messages:[H], sections:[{heading:H, paragraphs:[H], bullets:[H], table_columns:[H, 'b'], table_rows:[[H]]}], recommendations:[{priority:'High', action:H, owner:H, rationale:H}], caveats:[H]};
+  appData.aiReports = [{id:'AR1', type:'board', typeName:H, audience:H, length:'short', scopeLabel:H, report:HR, model:H, at:H}]; rw().open = 'AR1';
+  ['ask','aireports'].forEach(v => { try { const h = VIEW_RENDERERS[v](''); if (BAD.test(h)) out.push(`FAIL ${v}: unescaped markup`); } catch(e){ out.push(`FAIL ${v}: ${e.message}`); } });
+  check('Report document (print / Word) carries no live markup', BAD.test(rwDocument(appData.aiReports[0], true).replace('onclick="window.print()"', '')), false);
+  check('Report as plain text includes every section', rwText(appData.aiReports[0]).split(H).length - 1 >= 8, true);
+  appData.chat = []; appData.aiReports = []; rw().open = null;
+  // 6 · Re-keying a reviewed framework keeps every link
   const rk = rekeyFramework(normaliseFramework(SAMPLE_WASH, 'X3'), 'P7');
   check('Re-keyed framework: every indicator points at a node of the same programme', rk.indicators.every(i => i.prog === 'P7' && rk.nodes.some(n => n.id === i.node)) && rk.nodes.every(n => !n.parent || rk.nodes.some(m => m.id === n.parent)), true);
   Object.assign(appData, saved); if (appData.org){ generateResults(); applyBrand(); }

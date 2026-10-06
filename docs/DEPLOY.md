@@ -45,8 +45,8 @@ Only `OPENAI_API_KEY` is required. The rest have safe defaults:
 | Setting | Default | What it does |
 |---|---|---|
 | `OPENAI_MODEL` | `gpt-4.1-mini` | Extraction model. Must support PDF input and structured outputs. |
-| `AI_LIMIT_PER_IP_DAY` | 25 | AI requests per visitor per day — a set-up with three programmes uses four |
-| `AI_LIMIT_TOTAL_DAY` | 300 | AI requests for the whole site per day — the cost ceiling |
+| `AI_LIMIT_PER_IP_DAY` | 40 | AI requests per visitor per day — a set-up with three programmes uses four; each Ask question and each AI report uses one |
+| `AI_LIMIT_TOTAL_DAY` | 500 | AI requests for the whole site per day — the cost ceiling |
 | `AI_MAX_PDF_MB` | 8 | Largest PDF accepted |
 | `AI_MAX_TEXT_CHARS` | 150000 | Longest text accepted (about 40 pages) |
 | `APP_SALT` | — | Any random string; visitor IPs are counted by salted hash, never stored |
@@ -63,7 +63,7 @@ protect against abuse; the OpenAI limit is the hard stop.
 curl -s https://mel.eval360.tech/logframe/api/status.php
 
 # Must all be 403 or 404 — never 200
-for p in .env .env.example api/lib.php api/lib_web.php api/lib_org.php storage/ tests/ .git/config; do
+for p in .env .env.example api/lib.php api/lib_web.php api/lib_org.php api/lib_ai.php storage/ tests/ .git/config; do
   echo "$p $(curl -s -o /dev/null -w '%{http_code}' https://mel.eval360.tech/logframe/$p)"; done
 ```
 
@@ -77,8 +77,8 @@ to 16M in the PHP settings for the domain, or lower `AI_MAX_PDF_MB`.
 
 Nothing to change on the server beyond pulling: `bash scripts/deploy_pull.sh`. The key file stays where it is.
 - The server now also makes outbound requests to the websites visitors enter — most shared hosts allow this.
-- The default per-visitor limit is now 25 AI requests a day (a set-up uses one per programme plus one);
-  if your key file sets `AI_LIMIT_PER_IP_DAY=10`, raise it.
+- The default per-visitor limit is now 40 AI requests a day (a set-up uses one per programme plus one; each
+  Ask question and AI report uses one); if your key file sets a lower `AI_LIMIT_PER_IP_DAY`, consider raising it.
 - Visitors' browsers start fresh: build 1's saved logframe is not carried over.
 
 ## 5 · Every update
@@ -93,7 +93,8 @@ On the server: `bash scripts/deploy_pull.sh`. The key file is untracked and neve
 
 ## Cost and usage
 
-Each AI request is one OpenAI call: the website profile, then one per programme. With `gpt-4.1-mini`
+Each AI request is one OpenAI call: the website profile, one per programme, one per Ask Eval360
+question, one per AI report. Ask and reports send the organisation's data (typically 5–25 KB) with every call. With `gpt-4.1-mini`
 a full set-up with three programmes should cost a few cents; a long PDF a little more (estimates — the
 usage log has the real token counts). Every call is logged — date, hashed visitor, model, tokens, no content — in
 `storage/logs/usage-YYYY-MM.csv` (blocked from the web).

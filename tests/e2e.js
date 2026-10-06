@@ -90,6 +90,24 @@ if (location.hash === '#e2e') (async () => {
     ok('Add a programme by pasting its logframe', appData.setup && appData.setup.stage === 'review' && appData.setup.programmes[0].source.pasted === true);
     ACTIONS['rv-accept']();
     ok('Portfolio now has four programmes', appData.programmes.length === 4);
+    // Ask Eval360 — the question and the organisation's data reach the server
+    showView('ask');
+    await askSend('Which programmes are off track?');
+    const last = appData.chat[appData.chat.length - 1];
+    ok('Ask: answer received and rendered', last.role === 'assistant' && document.querySelector('#ask-chat .msg.ai .md') !== null, last.content.slice(0, 60));
+    ok('Ask: the server saw every programme and indicator', last.content.includes(`has ${appData.programmes.length} programme(s) and ${allInds().length} indicators`), last.content.split('\n')[4]);
+    ok('Ask: markdown table rendered', document.querySelector('#ask-chat .md table') !== null);
+    appData.aiScope = 'P1'; await askSend('How is this programme doing?');
+    ok('Ask: programme scope sends only that programme', appData.chat[appData.chat.length - 1].content.includes(`has 1 programme(s) and ${appData.programmes[0].fw.indicators.length} indicators`));
+    appData.aiScope = 'org';
+    // AI report writer
+    showView('aireports'); rw().type = 'donor'; rw().audience = 'Donor';
+    await ACTIONS['rw-go']();
+    const rep = (appData.aiReports || [])[0];
+    ok('Report: written, stored and shown', !!rep && rep.report.title.includes('Kijani') && document.querySelector('.rep-doc h1') !== null, rep ? rep.report.title : 'none');
+    ok('Report: Word and text exports build', rwDocument(rep, false).includes('<h1>') && rwText(rep).includes('RECOMMENDATIONS'));
+    const kept = JSON.parse(localStorage.getItem(STORE_KEY));
+    ok('Conversation and report kept in this browser', kept.chat.length === 4 && kept.aiReports.length === 1);
   } catch(e){ out.push('FAIL exception — ' + (e && e.stack || e)); }
   const pre = document.createElement('pre'); pre.id = 'e2e'; pre.textContent = out.join('\n'); document.body.appendChild(pre);
 })();
