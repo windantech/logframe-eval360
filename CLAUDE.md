@@ -2,7 +2,7 @@
 
 Last updated: 2026-10-06 (build 2.0 — organisations, multiple programmes, website reading, branding)
 
-A public demonstration that **sets itself up for the visitor's programmes**. Two entry points: (A) upload
+A public demonstration that **sets itself up for the visitor's programmes**. Two entry points: (A) upload or paste
 one or more logframes — no organisation name or website required (`minimalOrg`, name taken from the
 logframe; strategic goals optional, addable later on the strategy screen); (B) give a name and website; the server reads the website (homepage + up to five relevant pages); AI builds the
 organisation profile, strategic goals and programmes. Each programme gets its framework from an uploaded

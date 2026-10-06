@@ -1253,7 +1253,8 @@ function applyBrand(){
 /* ═══ 12. PERSISTENCE — this browser only; nothing is stored on the server ═ */
 function saveState(){
   try {
-    const setup = appData.setup ? Object.assign({}, appData.setup, {programmes:(appData.setup.programmes || []).map(p => Object.assign({}, p, {payload:null}))}) : null;
+    // File contents are never stored: uploads are dropped, payloads cleared (pasted text is kept so it can be rebuilt).
+    const setup = appData.setup ? Object.assign({}, appData.setup, {uploads:[], programmes:(appData.setup.programmes || []).map(p => Object.assign({}, p, {payload:null}))}) : null;
     localStorage.setItem(STORE_KEY, JSON.stringify({v:2, org:appData.org, programmes:appData.programmes.map(p => Object.assign({}, p, {quarters:undefined})),
       current:appData.current, overrides:appData.overrides, log:appData.log.filter(e => e.live).slice(0, 300), settings:appData.settings, setup}));
   } catch(e){ /* private window or storage full — the session still works */ }
@@ -1627,12 +1628,16 @@ VIEW_RENDERERS['setup'] = () => {
       ${err}
       <div class="grid-2" style="gap:16px;align-items:stretch">
       <div class="wiz-card" style="margin:0"><div class="m-code" style="margin-bottom:6px"><i class="bi bi-file-earmark-arrow-up"></i> OPTION A</div><h2>Start from your logframe(s)</h2>
-        <p class="lead">Upload one or more logframes — each becomes a programme with its own dashboard, matrix and indicators. No website needed.</p>
+        <p class="lead">Upload or paste one or more logframes — each becomes a programme with its own dashboard, matrix and indicators. No website needed.</p>
         <label class="drop" for="su-files" style="padding:22px 16px"><i class="bi bi-cloud-arrow-up"></i><b style="font-size:15px">Choose logframe files</b>
           <span class="small">PDF, Word (.docx), Excel (.xlsx), CSV or text · several at once</span></label>
         <input type="file" id="su-files" data-action="su-files" multiple accept=".pdf,.docx,.xlsx,.xlsm,.xls,.ods,.csv,.tsv,.txt,.md" style="display:none" ${busy || !ai.available ? 'disabled' : ''}>
+        <details style="margin-top:10px"${s.pasteOpen ? ' open' : ''}><summary class="small" style="cursor:pointer;font-weight:600;color:var(--brand)"><i class="bi bi-clipboard"></i> …or paste a logframe</summary>
+          <textarea class="paste" id="su-paste" data-action="su-paste-input" style="min-height:130px;margin-top:8px" placeholder="Paste the logframe table or results framework — goal, outcomes, outputs, indicators, baselines, targets. Copying straight from Word or Excel works.">${esc(s.pasteDraft || '')}</textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><input id="su-paste-name" data-action="su-paste-name" value="${esc(s.pasteName || '')}" placeholder="Programme name (optional)" style="flex:1;min-width:160px;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font:inherit;font-size:12.5px">
+            <button class="btn btn-sm" data-action="su-paste-add" ${ai.available ? '' : 'disabled'}><i class="bi bi-plus-lg"></i> Add pasted logframe</button></div></details>
         ${up.length ? `<div style="margin-top:10px">${up.map(u => `<div class="brow" style="padding:7px 0">${u.payload ? '<i class="bi bi-file-earmark-check" style="color:var(--ok)"></i>' : u.error ? '<i class="bi bi-x-circle" style="color:var(--bad)"></i>' : '<div class="spin" style="width:16px;height:16px;border-width:2px"></div>'}
-            <div style="flex:1;min-width:0"><div style="font-weight:500;overflow:hidden;text-overflow:ellipsis">${esc(u.filename)}</div>${u.error ? `<div class="small" style="color:var(--bad)">${esc(u.error)}</div>` : u.payload ? `<div class="small muted">${u.payload.kind === 'pdf' ? 'PDF — sent as it is' : num(u.payload.chars) + ' characters read'}</div>` : '<div class="small muted">Reading…</div>'}</div>
+            <div style="flex:1;min-width:0"><div style="font-weight:500;overflow:hidden;text-overflow:ellipsis">${u.pasted ? '<i class="bi bi-clipboard muted"></i> ' : ''}${esc(u.filename)}</div>${u.error ? `<div class="small" style="color:var(--bad)">${esc(u.error)}</div>` : u.payload ? `<div class="small muted">${u.payload.kind === 'pdf' ? 'PDF — sent as it is' : num(u.payload.chars) + (u.pasted ? ' characters pasted' : ' characters read')}</div>` : '<div class="small muted">Reading…</div>'}</div>
             <button class="x btn btn-sm btn-ghost" data-action="su-up-del" data-key="${u.key}" aria-label="Remove ${esc(u.filename)}"><i class="bi bi-x-lg"></i></button></div>`).join('')}</div>` : ''}
         <div class="fld" style="margin-top:12px"><label for="su-lf-org">Organisation name <span class="muted">(optional — taken from the logframe if left blank)</span></label>
           <input id="su-lf-org" data-action="su-lf-org" value="${esc(s.lfOrg || '')}" placeholder="e.g. Kijani Water Trust"></div>
@@ -1684,6 +1689,23 @@ CHANGES['su-files'] = async t => {
   for (const [u, f] of rows){ try { u.payload = await im_filePayload(f); } catch(e){ u.error = e.message; } redraw(); }
   s.converting = false; redraw();
 };
+/* A pasted logframe is the same as an uploaded text file. */
+const PASTE_MIN = 80;
+function pastedPayload(text, name){
+  text = String(text || '').replace(/\r\n?/g, '\n').replace(/\t/g, ' | ').replace(/\n{3,}/g, '\n\n').trim();   // tabs from Word/Excel tables → cell separators
+  if (text.length < PASTE_MIN) throw new Error('Paste the whole logframe — at least a few lines with results and indicators.');
+  return {kind:'text', filename:name || 'Pasted logframe', text, chars:text.length};
+}
+CHANGES['su-paste-input'] = t => { su().pasteDraft = t.value; };
+CHANGES['su-paste-name'] = t => { su().pasteName = t.value.trim(); };
+ACTIONS['su-paste-add'] = () => {
+  const s = su(), el = document.getElementById('su-paste'), nm = document.getElementById('su-paste-name');
+  const text = el ? el.value : s.pasteDraft, name = (nm ? nm.value : s.pasteName || '').trim();
+  let payload; try { payload = pastedPayload(text, name || `Pasted logframe ${(s.uploads || []).filter(u => u.pasted).length + 1}`); } catch(e){ toast(e.message, 'warn'); return; }
+  s.uploads = s.uploads || [];
+  s.uploads.push({key:`u${Date.now().toString(36)}${++su_key}`, filename:payload.filename, payload, error:null, pasted:true, named:!!name});
+  s.pasteDraft = ''; s.pasteName = ''; s.pasteOpen = true; redraw(); toast(`${payload.filename} added — ${num(payload.chars)} characters.`, 'ok');
+};
 ACTIONS['su-up-del'] = t => { const s = su(); s.uploads = (s.uploads || []).filter(u => u.key !== t.dataset.key); redraw(); };
 CHANGES['su-lf-org'] = t => { su().lfOrg = t.value.trim(); saveState(); };
 /* A programme's name from its file name until the logframe says otherwise. */
@@ -1694,7 +1716,7 @@ ACTIONS['su-from-logframes'] = () => {
   const name = s.lfOrg || '';
   s.path = 'logframe'; s.addOnly = false; s.error = null;
   s.org = minimalOrg(name || 'My organisation', {kind:'logframe', nameGiven:!!name});
-  s.programmes = ok.map(u => su_newProg({name:nameFromFile(u.filename), short:'', mode:'upload', filename:u.filename, payload:u.payload, autoName:true}));
+  s.programmes = ok.map(u => su_newProg({name:u.pasted ? u.filename : nameFromFile(u.filename), short:'', mode:'upload', filename:u.filename, payload:u.payload, autoName:!(u.pasted && u.named)}));
   s.stage = 'building'; saveState(); redraw(); su_runAll();
 };
 ACTIONS['su-sample'] = () => {
@@ -1713,12 +1735,14 @@ function su_programmesStage(s, err){
       <div class="small muted" style="margin-top:4px">${p.basis === 'stated' ? `${webBadge('Named on your website')}${p.sourceUrl ? ` <a class="src-link" href="${esc(p.sourceUrl)}" target="_blank" rel="noopener">${esc(p.sourceUrl)}</a>` : ''}` : draftBadge('Proposed by AI')}
         ${p.location ? ' · ' + esc(p.location) : ''}</div></div>
     <div><div class="small" style="font-weight:600;margin-bottom:6px">Its results framework</div>
-      <div class="choice">${[['draft','AI drafts one'], ['upload','Upload our logframe'], ['skip','Leave out']].map(([m, l]) =>
+      <div class="choice">${[['draft','AI drafts one'], ['upload','Upload our logframe'], ['paste','Paste our logframe'], ['skip','Leave out']].map(([m, l]) =>
         `<button class="${p.mode === m ? 'on' : ''}" data-action="su-mode" data-key="${p.key}" data-mode="${m}">${esc(l)}</button>`).join('')}</div>
       ${p.mode === 'upload' ? `<div style="margin-top:8px"><label class="btn btn-sm" for="su-file-${p.key}"><i class="bi bi-upload"></i> ${p.filename ? 'Replace file' : 'Choose file'}</label>
           <input type="file" id="su-file-${p.key}" data-action="su-file" data-key="${p.key}" accept=".pdf,.docx,.xlsx,.xlsm,.xls,.ods,.csv,.tsv,.txt,.md" style="display:none">
           ${p.filename ? `<span class="small" style="margin-left:6px"><i class="bi bi-file-earmark-check" style="color:var(--ok)"></i> ${esc(p.filename)}${p.payload && p.payload.chars ? ` · ${num(p.payload.chars)} characters` : ''}</span>` : '<span class="small muted" style="margin-left:6px">PDF, Word, Excel, CSV or text</span>'}
           ${p.error ? `<div class="small" style="color:var(--bad);margin-top:4px">${esc(p.error)}</div>` : ''}</div>`
+        : p.mode === 'paste' ? `<div style="margin-top:8px"><textarea data-action="su-ppaste" data-key="${p.key}" style="min-height:110px;font:12px/1.5 'JetBrains Mono',monospace" placeholder="Paste this programme\u2019s logframe — results, indicators, baselines, targets.">${esc(p.pasteText || '')}</textarea>
+            <div class="small ${p.payload ? '' : 'muted'}" style="margin-top:4px;${p.error ? 'color:var(--bad)' : p.payload ? 'color:var(--ok)' : ''}">${p.error ? esc(p.error) : p.payload ? `<i class="bi bi-check2"></i> ${num(p.payload.chars)} characters ready` : `At least ${PASTE_MIN} characters.`}</div></div>`
         : p.mode === 'draft' ? `<div class="small muted" style="margin-top:8px">A realistic proposal for this programme — labelled as AI-drafted throughout. Replace it with your own logframe at any time.</div>` : ''}
     </div></div>`;
   const active = s.programmes.filter(p => p.mode !== 'skip');
@@ -1759,6 +1783,12 @@ ACTIONS['su-swatch'] = t => { su().org.brand.primary = hexOk(t.dataset.c); saveS
 CHANGES['su-colour'] = t => { su().org.brand.primary = hexOk(t.value); saveState(); su_previewBrand(); redraw(); };
 function su_previewBrand(){ const o = su().org, t = brandTokens(o.brand.primary); if (t) Object.entries(t).forEach(([k, v]) => document.documentElement.style.setProperty(k, v)); }
 ACTIONS['su-add'] = () => { const s = su(); s.programmes.push(su_newProg({name:'New programme', description:'', basis:'stated', mode:'upload'})); saveState(); redraw(); };
+CHANGES['su-ppaste'] = t => {
+  const p = su_prog(t.dataset.key); if (!p) return;
+  p.pasteText = t.value; p.error = null;
+  try { p.payload = pastedPayload(t.value, `${p.name} (pasted)`); p.filename = 'pasted text'; } catch(e){ p.payload = null; if (t.value.trim()) p.error = e.message; }
+  saveState(); redraw();
+};
 CHANGES['su-more'] = async t => {
   const s = su(), files = [...(t.files || [])]; t.value = '';
   for (const f of files){ const p = su_newProg({name:nameFromFile(f.name), mode:'upload', filename:f.name, autoName:true}); s.programmes.push(p); redraw();
@@ -1773,16 +1803,17 @@ function su_buildingStage(s, err){
     : p.status === 'working' ? '<div class="spin" style="width:18px;height:18px;border-width:2px"></div>' : '<i class="bi bi-hourglass" style="color:var(--ink-mute)"></i>';
   const L = s.programmes.filter(p => p.mode !== 'skip'), done = L.filter(p => ['ready','error'].includes(p.status)).length;
   return `${err}<div class="wiz-card"><h2>Building ${s.addOnly ? 'the programme' : 'your dashboard'}</h2><p class="lead">${done} of ${L.length} done. Uploaded logframes are read as written; the others are drafted as proposals for your organisation.</p>
-    ${L.map(p => `<div class="brow">${icon(p)}<div style="flex:1"><b>${esc(p.name)}</b><div class="small muted">${p.mode === 'upload' ? `Reading ${esc(p.filename)}` : 'Drafting a results framework'}${p.status === 'ready' ? ` — ${plural(p.fw.indicators.length, 'indicator')}` : ''}</div>
+    ${L.map(p => `<div class="brow">${icon(p)}<div style="flex:1"><b>${esc(p.name)}</b><div class="small muted">${p.mode === 'upload' ? `Reading ${esc(p.filename)}` : p.mode === 'paste' ? 'Reading the pasted logframe' : 'Drafting a results framework'}${p.status === 'ready' ? ` — ${plural(p.fw.indicators.length, 'indicator')}` : ''}</div>
       ${p.error ? `<div class="small" style="color:var(--bad)">${esc(p.error)}</div>` : ''}</div>
       ${p.status === 'error' ? `<button class="btn btn-sm" data-action="su-retry" data-key="${p.key}">Retry</button> <button class="btn btn-sm btn-ghost" data-action="su-drop" data-key="${p.key}">Leave out</button>` : ''}</div>`).join('')}
     ${done === L.length ? `<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn btn-primary" data-action="su-to-review" ${L.some(p => p.status === 'ready') ? '' : 'disabled'}>Review the results <i class="bi bi-arrow-right"></i></button></div>` : ''}</div>`;
 }
 async function su_runOne(p){
   const s = su(); p.status = 'working'; p.error = null; redraw();
+  if (p.mode === 'paste' && !p.payload && p.pasteText){ try { p.payload = pastedPayload(p.pasteText, `${p.name} (pasted)`); } catch(e){ /* reported below */ } }
   try {
     let d;
-    if (p.mode === 'upload'){ if (!p.payload) throw new Error('Choose the logframe file again — it is not kept after a reload.'); d = await apiPost('extract.php', p.payload);
+    if (p.mode === 'upload' || p.mode === 'paste'){ if (!p.payload) throw new Error(p.mode === 'paste' ? 'Paste the logframe again — it is not kept after a reload.' : 'Choose the logframe file again — it is not kept after a reload.'); d = await apiPost('extract.php', p.payload);
       if (!d.framework.is_logframe) throw new Error(`This does not look like a results framework: ${d.framework.not_logframe_reason || 'no results or indicators found'}.`); }
     else d = await apiPost('draft.php', {org:{name:s.org.name, type:s.org.type, sector:s.org.sector, country:s.org.country, summary:s.org.summary, mission:s.org.mission},
       programme:{name:p.name, description:p.description, location:p.location, target_group:p.targetGroup}});
@@ -1790,7 +1821,7 @@ async function su_runOne(p){
     if (p.autoName && str(d.framework.title)){ p.name = str(d.framework.title); p.short = ''; }
     if (s.org && s.org.source.kind === 'logframe' && !s.org.source.nameGiven && str(d.framework.organisation)){ s.org.name = str(d.framework.organisation); s.org.short = initialsOf(s.org.name); s.org.source.nameGiven = true; }
     if (!p.short) p.short = initialsOf(p.name).slice(0, 6);
-    p.source = {kind:p.mode === 'upload' ? 'upload' : 'drafted', filename:p.mode === 'upload' ? p.filename : null, model:d.meta.model, at:d.meta.generated_at || d.meta.extracted_at, reviewedAt:null};
+    p.source = {kind:p.mode === 'draft' ? 'drafted' : 'upload', pasted:p.mode === 'paste' || (p.payload && p.payload.kind === 'text' && /^Pasted|pasted/.test(p.filename || '')), filename:p.mode === 'draft' ? null : (p.mode === 'paste' ? 'pasted text' : p.filename), model:d.meta.model, at:d.meta.generated_at || d.meta.extracted_at, reviewedAt:null};
     p.fw = null; p.status = 'ready';
   } catch(e){ p.status = 'error'; p.error = e.message; }
   saveState(); redraw();
@@ -1803,8 +1834,8 @@ async function su_runAll(){
 }
 ACTIONS['su-build'] = () => {
   const s = su(), L = s.programmes.filter(p => p.mode !== 'skip');
-  const missing = L.filter(p => p.mode === 'upload' && !p.payload);
-  if (missing.length){ toast(`Choose the logframe file for ${missing.map(p => p.name).join(', ')} — or switch it to an AI draft.`, 'warn'); return; }
+  const missing = L.filter(p => (p.mode === 'upload' || p.mode === 'paste') && !p.payload);
+  if (missing.length){ toast(`Add the logframe for ${missing.map(p => p.name).join(', ')} — upload or paste it, or switch it to an AI draft.`, 'warn'); return; }
   if (L.some(p => p.name.trim().length < 3)){ toast('Every programme needs a name.', 'warn'); return; }
   L.forEach(p => { p.status = 'idle'; p.error = null; });
   s.stage = 'building'; s.error = null; saveState(); redraw(); su_runAll();
@@ -1873,7 +1904,7 @@ VIEW_RENDERERS['review'] = () => {
     const p = ready.find(x => x.key === tab), fw = p.fw, goal = fw.nodes.find(n => n.level === 'goal');
     const lv = l => fw.nodes.filter(n => n.level === l).length;
     body = `${p.source.kind === 'drafted' ? banner('warn', 'bi-stars', '<b>AI-drafted proposal.</b> This framework was written by AI from public information about your organisation. Baselines and targets are plausible proposals, not your figures — edit them, or replace the whole framework with your own logframe later.')
-        : banner('info', 'bi-file-earmark-check', `Read from <b>${esc(p.source.filename)}</b>. Check every statement and number against your document; amber fields were missing or uncertain.`)}
+        : banner('info', p.source.pasted ? 'bi-clipboard-check' : 'bi-file-earmark-check', `Read from ${p.source.pasted ? 'the text you pasted' : `<b>${esc(p.source.filename)}</b>`}. Check every statement and number against your document; amber fields were missing or uncertain.`)}
       <div class="kpi-row">${kpi({label:'Outcomes', value:lv('outcome')})}${kpi({label:'Outputs', value:lv('output')})}${kpi({label:'Indicators', value:fw.indicators.length})}
         ${kpi({label:'Without a target', value:fw.indicators.filter(i => i.target === null).length, tone:'warn'})}${kpi({label:'Without a baseline', value:fw.indicators.filter(i => i.baseline === null).length, tone:'warn'})}</div>
       ${card('Programme', `<div class="form-grid"><div class="fld full"><label>Name</label><input value="${esc(p.name)}" data-action="su-pfield" data-key="${p.key}" data-f="name"></div>
@@ -1971,14 +2002,16 @@ ACTIONS['pf-add'] = () => {
   openModal({title:'Add a programme', body:`<form id="pf-add-form" data-action="pf-add-form"><div class="form-grid">
       <div class="fld full"><label for="pa-n">Programme name</label><input id="pa-n" name="name" required></div>
       <div class="fld full"><label for="pa-d">What it does</label><textarea id="pa-d" name="description" rows="3" placeholder="Objectives, where, for whom."></textarea></div>
-      <div class="fld full"><label for="pa-f">Its logframe <span class="muted">(optional — without one, AI drafts a proposal)</span></label><input id="pa-f" name="file" type="file" accept=".pdf,.docx,.xlsx,.xlsm,.xls,.ods,.csv,.tsv,.txt,.md"></div></div></form>`,
+      <div class="fld full"><label for="pa-f">Its logframe <span class="muted">(optional — without one, AI drafts a proposal)</span></label><input id="pa-f" name="file" type="file" accept=".pdf,.docx,.xlsx,.xlsm,.xls,.ods,.csv,.tsv,.txt,.md"></div>
+      <div class="fld full"><label for="pa-t">…or paste it</label><textarea id="pa-t" name="pasted" rows="5" placeholder="Paste the logframe text here"></textarea></div></div></form>`,
     foot:`<button class="btn" data-action="close-modal">Cancel</button><button class="btn btn-primary" type="submit" form="pf-add-form"><i class="bi bi-magic"></i> Build</button>`});
 };
 SUBMITS['pf-add-form'] = async (f, fd) => {
   const name = String(fd.get('name') || '').trim(); if (name.length < 3){ toast('Give the programme a name.', 'warn'); return; }
-  const file = fd.get('file');
-  const p = su_newProg({name, short:initialsOf(name), description:String(fd.get('description') || '').trim(), mode:file && file.size ? 'upload' : 'draft'});
+  const file = fd.get('file'), pasted = String(fd.get('pasted') || '').trim();
+  const p = su_newProg({name, short:initialsOf(name), description:String(fd.get('description') || '').trim(), mode:file && file.size ? 'upload' : pasted ? 'paste' : 'draft'});
   if (p.mode === 'upload'){ try { p.payload = await im_filePayload(file); p.filename = file.name; } catch(e){ toast(e.message, 'warn'); return; } }
+  if (p.mode === 'paste'){ try { p.payload = pastedPayload(pasted, `${name} (pasted)`); p.filename = 'pasted text'; } catch(e){ toast(e.message, 'warn'); return; } }
   closeModal();
   appData.setup = {stage:'building', addOnly:true, org:appData.org, programmes:[p], error:null};
   showView('setup'); await su_runAll();

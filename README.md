@@ -2,8 +2,8 @@
 
 A public Eval360 demonstration that sets itself up for **your programmes**. Two ways in:
 
-- **Start from your logframe(s)** — upload one or several (PDF, Word, Excel, CSV or text). Each becomes a
-  programme. No organisation name or website is needed; the name is taken from the logframe.
+- **Start from your logframe(s)** — upload one or several (PDF, Word, Excel, CSV or text), or paste the
+  text straight from Word or Excel. Each becomes a programme. No organisation name or website is needed; the name is taken from the logframe.
 - **Start from your organisation** — enter its name and website: AI reads the website and builds the
   profile, strategic goals and a list of programmes. For each programme, upload its logframe or let AI
   draft a realistic one.
