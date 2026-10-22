@@ -84,18 +84,39 @@ Generate the key with `openssl rand -hex 24`. Set a monthly spending limit in th
 before — a demo link makes no AI call, but the visitor who opens it can use Ask Eval360 and the report
 writer, and those do.
 
-**Email has to work, or people cannot get back in.** There is no login: when someone builds a demo we
-email them their own link, and that email is the only copy of it outside the browser they made it in. It
-goes out with PHP's `mail()`.
+### Email — the same relay the rest of Eval360 uses
 
-- Set `SHARE_NOTIFY_FROM` to a real address **on this domain** (`no-reply@eval360.tech`), not a Gmail
-  address — a From: the domain's SPF record does not authorise is what sends a message to spam.
-- Check SPF and DKIM for the domain cover the server that sends it.
-- Send yourself a demo and confirm it arrives in the inbox, not the spam folder, before the first prospect
-  sees the site.
+**This is load-bearing.** There is no login: when someone builds a demo we email them their own link, and
+that email is the only copy of it outside the browser they made it in. If the mail does not arrive, they
+lose their demo.
 
-If `mail()` is unavailable or refused, nothing breaks: the demo tells the visitor plainly that it could
-not email the link and to copy it now. But they lose the demo if they ignore that, so it is worth getting right.
+Mail therefore goes out through `mail.eval360.tech`, authenticated as `info@eval360.tech` — the same
+mailbox the MEL system sends from — so that it genuinely originates from the domain and passes SPF and
+DKIM. Put the same credentials in this project's key file:
+
+```ini
+SMTP_HOST=mail.eval360.tech
+SMTP_PORT=587
+SMTP_SECURE=tls
+SMTP_USER=info@eval360.tech
+SMTP_PASS=…          # the same password as the MEL system's _env
+SMTP_FROM=info@eval360.tech
+SMTP_FROM_NAME=Eval360
+```
+
+Copy the values across. **Do not point this project at the MEL `_env`:** that file also holds database
+passwords, DPO payment tokens and Kobo keys, and a public demo has no business being able to read it.
+
+Then send one and look — accepted is not the same as delivered:
+
+```bash
+php scripts/test_mail.php you@example.com
+```
+
+Replies go to `SHARE_CONTACT_EMAIL`, not the sending mailbox. Leave `SMTP_HOST` unset and mail falls back
+to PHP's `mail()`, which sends as the web server's own address; expect the spam folder. Either way nothing
+crashes: if the mail cannot be sent, the demo tells the visitor plainly that it could not email the link
+and that they should copy it now.
 
 **What a link stores.** The reviewed framework — results, indicators, baselines and targets as the visitor
 accepted them — so the link can open it. Uploaded PDFs, Word and Excel files are still never saved.

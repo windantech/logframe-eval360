@@ -58,15 +58,18 @@ else
     ok "key file present and readable: $ENVFILE"
     [ "$(stat -c '%a' "$ENVFILE" 2>/dev/null)" = "600" ] && ok "key file is chmod 600" || warn "key file is not chmod 600 — run: chmod 600 $ENVFILE"
     # Names only. A value is never printed by this script.
-    for k in OPENAI_API_KEY APP_SALT SHARE_NOTIFY_EMAIL SHARE_NOTIFY_FROM SHARE_ADMIN_KEY SHARE_MEETING_URL; do
-        if grep -qE "^[[:space:]]*$k[[:space:]]*=[[:space:]]*[^[:space:]]" "$ENVFILE" 2>/dev/null; then ok "$k is set"
+    has() { grep -qE "^[[:space:]]*$1[[:space:]]*=[[:space:]]*[^[:space:]]" "$ENVFILE" 2>/dev/null; }
+    for k in OPENAI_API_KEY APP_SALT SMTP_HOST SMTP_USER SMTP_PASS SMTP_FROM SHARE_NOTIFY_EMAIL SHARE_ADMIN_KEY SHARE_MEETING_URL; do
+        if has "$k"; then ok "$k is set"
         else
             case "$k" in
-              OPENAI_API_KEY)    bad "$k is NOT set — the demo cannot build anything" ;;
-              APP_SALT)          warn "$k is NOT set — a default is used; set any random string" ;;
-              SHARE_NOTIFY_FROM) bad "$k is NOT set — demo links we email visitors will likely go to spam" ;;
-              SHARE_ADMIN_KEY)   warn "$k is NOT set — api/pipeline.php stays a 404, so you cannot see who opened what" ;;
-              *)                 warn "$k is NOT set — see docs/DEPLOY.md §3b" ;;
+              OPENAI_API_KEY)  bad  "$k is NOT set — the demo cannot build anything" ;;
+              APP_SALT)        warn "$k is NOT set — a default is used; set any random string" ;;
+              SMTP_HOST)       bad  "$k is NOT set — mail goes out through PHP mail() as the web server, which SPF does not authorise. The links people are emailed will land in spam, and there is no other way back into their demo." ;;
+              SMTP_PASS)       bad  "$k is NOT set — the relay will refuse to authenticate" ;;
+              SMTP_USER|SMTP_FROM) warn "$k is NOT set — see .env.example" ;;
+              SHARE_ADMIN_KEY) warn "$k is NOT set — api/pipeline.php stays a 404, so you cannot see who opened what" ;;
+              *)               warn "$k is NOT set — see docs/DEPLOY.md §3b" ;;
             esac
         fi
     done
@@ -78,12 +81,28 @@ if mkdir -p storage/share/demos 2>/dev/null && [ -w storage/share/demos ]; then 
 else bad "storage/share/demos is NOT writable — nobody can create a demo link"; fi
 PHPBIN="$(command -v php || true)"
 if [ -n "$PHPBIN" ]; then
-    php -r 'exit(function_exists("mail") ? 0 : 1);' 2>/dev/null \
-      && ok "PHP mail() is available — visitors can be sent their link" \
-      || bad "PHP mail() is disabled — visitors cannot be emailed their link, and lose the demo if they close the tab"
     ok "PHP $(php -r 'echo PHP_VERSION;' 2>/dev/null)"
+    # Which way mail will actually go out. This is the whole return path: no
+    # login means the emailed link is the only way back into someone's demo.
+    TRANSPORT="$(php -r 'define("LF_ROOT", getcwd()); require "api/lib_mail.php";
+        $c = lf_mail_config(); echo lf_mail_smtp_ready() ? "smtp ".$c["host"]." ".$c["port"] : "mailfn";' 2>/dev/null)"
+    case "$TRANSPORT" in
+      smtp*)
+        set -- $TRANSPORT
+        ok "mail relays through SMTP ($2:$3)"
+        if command -v timeout >/dev/null 2>&1 && timeout 8 bash -c "exec 3<>/dev/tcp/$2/$3" 2>/dev/null; then
+            ok "the relay answers on $2:$3"
+        else
+            bad "cannot reach $2:$3 from this server — outbound SMTP may be blocked by the host"
+        fi ;;
+      mailfn)
+        bad "mail would go out through PHP mail(), not the Eval360 relay — set SMTP_HOST (see .env.example)"
+        php -r 'exit(function_exists("mail") ? 0 : 1);' 2>/dev/null || bad "and mail() is disabled too, so no mail can be sent at all" ;;
+      *) warn "could not work out how mail is configured" ;;
+    esac
+    echo "  NEXT  send one and look: php scripts/test_mail.php you@example.com"
 else
-    warn "no php on PATH — skipped the mail() and version checks"
+    warn "no php on PATH — skipped the mail and version checks"
 fi
 
 # ── 4 · What a visitor gets ─────────────────────────────────────────────────

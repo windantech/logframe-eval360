@@ -24,3 +24,7 @@ Thumbs.db
 
 # Test runs
 _e2e_test.html
+
+# Python bytecode from the SMTP test
+__pycache__/
+*.pyc

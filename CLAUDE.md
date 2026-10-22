@@ -31,12 +31,14 @@ api/lib_ai.php               Ask Eval360 and report-writer prompts, report schem
 api/ask.php                  POST — question + history + organisation data in, markdown answer out
 api/report.php               POST — report type, audience, length + organisation data in, structured report out
 api/status.php               GET  — is AI on, can a demo be shared, requests left today (never the key)
+api/lib_mail.php             SMTP (or mail()) — so a demo link reaches an inbox, not a spam folder
 api/lib_share.php            the demo-link store: one JSON file per demo under storage/, flock'd
 api/share.php                POST — create / open / unlock / save / fork / event for a demo link
 api/pipeline.php             GET  — who built, opened and asked for a meeting (SHARE_ADMIN_KEY only)
 samples/                     sample logframe as CSV, DOCX, PDF — for visitors to try an upload
 tests/e2e.js                 end-to-end harness, injected only by scripts/e2e.sh — never shipped
 tests/fixture_site/          a fictional NGO website the e2e test reads
+tests/fake_smtp.py           a fake SMTP server; tests/smtp_test.py drives api/lib_mail.php at it
 scripts/                     selftest.sh, e2e.sh, deploy_pull.sh
 storage/                     created at runtime: rate limits, usage log, shared demos — gitignored,
                              web-blocked; LF_STORAGE_DIR moves it (the e2e test points it at a temp dir)
@@ -118,7 +120,15 @@ wording; `VIEW_RENDERERS['journey']` is the screen.
 - **There is no login — the link is the credential**, so the creator is emailed theirs
   (`lf_share_owner_mail()`): their own link carrying `&t=`, and separately the link to pass on, with the
   difference spelled out. Without that email the edit token exists only in the browser that made it, and
-  closing the tab loses the demo. If `mail()` fails the modal says so and tells them to copy the link.
+  closing the tab loses the demo. If sending fails the modal says so and tells them to copy the link.
+- Because of that, **mail has to arrive**, so `lf_mail()` relays through the same authenticated
+  `mail.eval360.tech` mailbox as the MEL system: a From: the domain's SPF does not authorise is spam.
+  `api/lib_mail.php` speaks SMTP itself — about a hundred lines, no Composer. It does **not** reuse the
+  MEL system's SwiftMailer, which is abandoned, belongs to a separately deployed app, and is configured
+  from an env file holding database passwords and payment tokens; the demo keeps its own `SMTP_*`.
+  It will not downgrade: if `SMTP_SECURE=tls` and the server does not offer STARTTLS, or the certificate
+  does not verify, it fails rather than send the password in the clear. `php scripts/test_mail.php` sends
+  a real one, because accepted is not delivered.
 - **Stage** (`LF_SHARE_STAGES`, 1–7) is where a prospect has got to. Evidence moves it forward only —
   created sets 2, a meeting click sets 3 — and Vantage sets 4–7 from the pipeline page, which may also
   move it back (`$force`). `journeyNow()` reads it so the visitor sees their own progress.
@@ -156,12 +166,14 @@ wording; `VIEW_RENDERERS['journey']` is the screen.
 
 ```bash
 bash scripts/selftest.sh   # model checks + every screen against the sample and awkward extractions
-bash scripts/e2e.sh        # website → profile → upload + draft → review → accept → add programme (mock)
+bash scripts/e2e.sh        # website → profile → upload + draft → review → accept → add programme,
+                           # then the whole demo-link path, through PHP in mock mode
+bash scripts/mailtest.sh   # api/lib_mail.php against a fake SMTP server; no network, no mailbox
 ```
 
 ## Working agreement
 
-1. Both tests pass before every commit.
+1. All three test scripts pass before every commit.
 2. Changing a schema: update the schema, its instructions, its mock, the sample (`SAMPLE_PROFILE`,
    `SAMPLE_FRAMEWORKS`) and the normaliser (`normaliseOrg`, `normaliseFramework`) together.
 3. Never log or display document content server-side. A stored demo is the one thing the server keeps,

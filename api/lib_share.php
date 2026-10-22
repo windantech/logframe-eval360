@@ -18,6 +18,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/lib.php';
+require_once __DIR__ . '/lib_mail.php';
 
 /* ── Configuration ───────────────────────────────────────────────────────── */
 function lf_share_config(): array
@@ -331,11 +332,8 @@ function lf_share_count_create(): void
 function lf_share_notify(string $subject, array $lines): void
 {
     $cfg = lf_share_config();
-    if (!$cfg['notify'] || !function_exists('mail')) return;
-    $body = implode("\n", $lines) . "\n\n-- \nEval360 demo pipeline\n";
-    $headers = ['Content-Type: text/plain; charset=utf-8'];
-    if ($cfg['notify_from']) $headers[] = 'From: Eval360 demos <' . $cfg['notify_from'] . '>';
-    @mail($cfg['notify'], '[Eval360 demo] ' . $subject, $body, implode("\r\n", $headers));
+    if (!$cfg['notify']) return;
+    lf_mail($cfg['notify'], '[Eval360 demo] ' . $subject, implode("\n", $lines) . "\n\n-- \nEval360 demo pipeline\n");
 }
 
 /* ═══ Where a prospect has got to ══════════════════════════════════════════
@@ -372,15 +370,9 @@ function lf_share_stage(string $slug, int $stage, bool $force = false): void
    them in control, the other is the one to pass on. */
 function lf_share_mail_owner(array $lead, string $orgName, int $programmes, string $shareUrl, string $ownerUrl, bool $isCopy = false): bool
 {
-    $cfg = lf_share_config();
-    if (!function_exists('mail') || !filter_var($lead['email'] ?? '', FILTER_VALIDATE_EMAIL)) return false;
+    if (!filter_var($lead['email'] ?? '', FILTER_VALIDATE_EMAIL)) return false;
     [$subject, $body] = lf_share_owner_mail($lead, $orgName, $programmes, $shareUrl, $ownerUrl, $isCopy);
-
-    $headers = ['Content-Type: text/plain; charset=utf-8'];
-    if ($cfg['notify_from']) $headers[] = 'From: Eval360 <' . $cfg['notify_from'] . '>';
-    if ($cfg['contact_email']) $headers[] = 'Reply-To: ' . $cfg['contact_email'];
-
-    return @mail($lead['email'], $subject, $body, implode("\r\n", $headers));
+    return lf_mail($lead['email'], $subject, $body, (string) ($lead['name'] ?? ''));
 }
 
 /** Subject and body, apart from the sending, so the wording can be tested. */
