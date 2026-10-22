@@ -121,6 +121,9 @@ if (location.hash === '#e2e') (async () => {
     ok('Link created and this browser owns it', !!slug && /^[a-z0-9]{12}$/.test(slug) && shRole() === 'owner' && !!appData.share.editToken, slug || 'none');
     ok('The link is remembered apart from the set-up, so Start over cannot lose it', linkToken(slug) === appData.share.editToken);
     ok('Audit trail records the link', appData.log.some(e => /created a link/.test(e.text)));
+    ok('A new demo starts at step two — built, waiting to be looked at', appData.share.meta.stage === 2 && appData.share.meta.stage_label === 'Demo to review');
+    ok('The server says whether it could email the link, and to whom',
+      typeof (await shareApi('open', {slug, edit_token:appData.share.editToken})).meta.stage === 'number');
     closeModal();
 
     // What actually reached the server
@@ -163,8 +166,8 @@ if (location.hash === '#e2e') (async () => {
     appData.settings.tolerance = 20;
     await ACTIONS['sh-fork']();
     closeModal();
-    const mine = appData.share.slug;
-    ok('The viewer keeps an editable copy of their own', shRole() === 'owner' && mine !== slug && !!appData.share.editToken, mine);
+    const mine = appData.share.slug, ownerToken = appData.share.editToken;
+    ok('The viewer keeps an editable copy of their own', shRole() === 'owner' && mine !== slug && !!ownerToken, mine);
     ok('The demo they were sent is unchanged', (await shareApi('open', {slug, pass:before})).payload.settings.tolerance === 10);
     ok('Their copy holds their edit', (await shareApi('open', {slug:mine, edit_token:appData.share.editToken})).payload.settings.tolerance === 20);
 
@@ -177,14 +180,43 @@ if (location.hash === '#e2e') (async () => {
     try { await shareApi('save', {slug, edit_token:'0'.repeat(32), payload:sharePayload()}); } catch(e){ notMine = e.message; }
     ok('A demo cannot be changed without its own edit token', !!notMine, notMine || 'accepted');
 
-    // Step three
+    // Coming back on another device — the emailed link is the only way in
+    localStorage.removeItem(LINKS_KEY);
+    appData.share = null;
+    await shareOpen(mine, ownerToken, null);
+    ok('The emailed link opens the demo as its owner on a browser that has never seen it',
+      shRole() === 'owner' && appData.share.slug === mine && !!appData.share.editToken && currentView === 'dashboard');
+    ok('The edit token is banked and taken straight out of the address bar',
+      linkToken(mine) === ownerToken && !location.search.includes('t='), location.search);
+    ok('Edits made before still there after coming back', appData.settings.tolerance === 15);
+    localStorage.removeItem(LINKS_KEY);
+    appData.share = null;
+    await shareOpen(mine, null, null);
+    ok('The same link without the token is a visitor, and is asked who they are',
+      !!appData.share.gate && shRole() === null);
+    await shareOpen(mine, ownerToken, null);
+
+    // Step three, and the steps after it
     ok('A meeting click is recorded', (await shareApi('event', {slug:mine, kind:'meeting', pass:null})).ok === true);
     ok('Unknown events are refused', await shareApi('event', {slug:mine, kind:'whatever'}).then(() => false, () => true));
+    const metStage = await shareApi('open', {slug:mine, edit_token:ownerToken});
+    ok('Asking for a meeting moves the demo to step three', metStage.meta.stage === 3 && metStage.meta.stage_label === 'Discovery meeting');
+    await fetch('api/pipeline.php?key=' + encodeURIComponent(ADMIN_KEY),
+      {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({slug:mine, stage:'5'})});
+    const setStage = await shareApi('open', {slug:mine, edit_token:ownerToken});
+    ok('Vantage sets the later steps from the pipeline page', setStage.meta.stage === 5 && setStage.meta.stage_label === 'Live');
+    await shareApi('event', {slug:mine, kind:'meeting', pass:null});
+    ok('Evidence never drags a demo backwards', (await shareApi('open', {slug:mine, edit_token:ownerToken})).meta.stage === 5);
+    appData.share.meta = setStage.meta;
+    showView('journey');
+    ok('How we work marks the step the server records',
+      journeyNow() === 5 && document.querySelectorAll('.jrny .st.done').length === 4 && /Go live/.test(document.querySelector('.jrny .st.now h4').textContent));
 
     // What Vantage sees
     const pipe = await (await fetch('api/pipeline.php?key=' + encodeURIComponent(ADMIN_KEY))).text();
     ok('Pipeline page lists the demo, both contacts and the meeting',
       pipe.includes('amina@kijani.example') && pipe.includes('bz@donor.example') && pipe.includes('Meeting requested') && pipe.includes('Edited copy'));
+    ok('Pipeline page shows and can change the step', pipe.includes('Step 5 ·') && pipe.includes('name="stage"'));
     ok('Pipeline page never shows the stored framework', !pipe.includes('Water points constructed') && !pipe.includes('safely managed drinking water'));
     const csv = await (await fetch('api/pipeline.php?key=' + encodeURIComponent(ADMIN_KEY) + '&csv=leads')).text();
     ok('Contacts download as CSV', csv.startsWith('first_seen_utc') && csv.includes('Boniface Zulu'));

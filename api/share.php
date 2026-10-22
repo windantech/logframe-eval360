@@ -66,6 +66,7 @@ function lf_share_meta(array $d, string $role): array
         'slug' => $d['slug'] ?? '', 'role' => $role, 'org_name' => $d['org_name'] ?? '', 'programmes' => (int) ($d['programmes'] ?? 0),
         'revision' => (int) ($d['revision'] ?? 1), 'created_at' => $d['created_at'] ?? null, 'updated_at' => $d['updated_at'] ?? null,
         'expires_at' => $d['expires_at'] ?? null, 'opens' => (int) ($d['opens'] ?? 0), 'is_copy' => !empty($d['parent']),
+        'stage' => (int) ($d['stage'] ?? 2), 'stage_label' => LF_SHARE_STAGES[(int) ($d['stage'] ?? 2)] ?? '',
     ];
 }
 
@@ -79,6 +80,10 @@ case 'create':
     $demo = lf_share_create($payload, $lead);
     lf_share_event($demo['slug'], 'created', $lead['org'], 1);
     $url = lf_share_public_url($demo['slug']);
+    $ownerUrl = lf_share_owner_url($demo['slug'], $demo['edit_token']);
+    // Without this the only copy of the link is a browser tab, and closing it
+    // loses the demo: the edit token lives in that browser and nowhere else.
+    $emailed = lf_share_mail_owner($lead, $demo['org_name'], count($payload['programmes']), $url, $ownerUrl);
     lf_share_notify('New demo: ' . ($lead['org'] !== '' ? $lead['org'] : $lead['name']), [
         'Someone built a demo and asked for a link.', '',
         'Name:         ' . $lead['name'],
@@ -87,9 +92,11 @@ case 'create':
         'Role:         ' . ($lead['role'] !== '' ? $lead['role'] : '—'),
         'Programmes:   ' . count($payload['programmes']),
         '', 'Review it: ' . $url,
+        'Their own link was ' . ($emailed ? 'emailed to them.' : 'NOT emailed — mail() is unavailable or was refused.'),
         '', 'Next step: a discovery meeting (step three).',
     ]);
-    lf_json(['ok' => true, 'slug' => $demo['slug'], 'edit_token' => $demo['edit_token'], 'url' => $url, 'meta' => lf_share_meta($demo, 'owner')]);
+    lf_json(['ok' => true, 'slug' => $demo['slug'], 'edit_token' => $demo['edit_token'], 'url' => $url,
+             'emailed' => $emailed, 'email' => $lead['email'], 'meta' => lf_share_meta($demo, 'owner')]);
 
 /* ── Open: somebody follows the link ────────────────────────────────────── */
 case 'open':
@@ -163,13 +170,16 @@ case 'fork':
     lf_share_event($slug, 'forked', $demo['slug'], lf_share_lead_id($pass));
     lf_share_event($demo['slug'], 'created', 'copy of ' . $slug, $lead ? 1 : null);
     $url = lf_share_public_url($demo['slug']);
+    $emailed = $lead ? lf_share_mail_owner($lead, $demo['org_name'], (int) $demo['programmes'], $url,
+        lf_share_owner_url($demo['slug'], $demo['edit_token']), true) : false;
     lf_share_notify('Demo copy edited: ' . ($parent['org_name'] !== '' ? $parent['org_name'] : $slug), [
         'A viewer saved their own edited copy of a demo — a strong buying signal.', '',
         'Who:      ' . ($lead ? $lead['name'] . ' <' . $lead['email'] . '>' . ($lead['org'] !== '' ? ' · ' . $lead['org'] : '') : '—'),
         'Original: ' . ($parent['org_name'] !== '' ? $parent['org_name'] : '—') . ' (' . $slug . ')',
         'Copy:     ' . $url,
     ]);
-    lf_json(['ok' => true, 'slug' => $demo['slug'], 'edit_token' => $demo['edit_token'], 'url' => $url, 'meta' => lf_share_meta($demo, 'owner')]);
+    lf_json(['ok' => true, 'slug' => $demo['slug'], 'edit_token' => $demo['edit_token'], 'url' => $url,
+             'emailed' => $emailed, 'email' => $lead['email'] ?? null, 'meta' => lf_share_meta($demo, 'owner')]);
 
 /* ── Event: what the visitor did with the demo ───────────────────────────── */
 case 'event':
@@ -181,6 +191,7 @@ case 'event':
     $leadId = lf_share_pass_ok($slug, $pass) ? lf_share_lead_id($pass) : null;
     lf_share_event($slug, $kind, mb_substr((string) ($in['detail'] ?? ''), 0, 200), $leadId);
     if ($kind === 'meeting') {
+        lf_share_stage($slug, 3);
         $l = lf_share_find_lead($demo, $leadId) ?: lf_share_find_lead($demo, (int) ($demo['owner_lead'] ?? 0));
         lf_share_notify('Discovery meeting requested: ' . ($demo['org_name'] !== '' ? $demo['org_name'] : $slug), [
             'Someone clicked through to book a discovery meeting (step three).', '',

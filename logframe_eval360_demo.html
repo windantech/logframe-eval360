@@ -3124,7 +3124,7 @@ SUBMITS['sh-create-form'] = async (form, fd) => {
     linkSave(d.slug, d.edit_token);
     addLog('created a link to this demo', {view:'journey', meta:''}, 'bi-link-45deg', {old:'in this browser only', new:'shareable link', reason:'Step two: send the demo to be reviewed'});
     saveState();
-    shareLinkModal(d.url, true, true);
+    shareLinkModal(d.url, true, true, d.emailed ? d.email : null);
     redraw();
   } catch(e){
     if (btn){ btn.disabled = false; btn.innerHTML = '<i class="bi bi-link-45deg"></i> Create the link'; }
@@ -3132,18 +3132,25 @@ SUBMITS['sh-create-form'] = async (form, fd) => {
   }
 };
 
-function shareLinkModal(url, owner, justMade){
+function shareLinkModal(url, owner, justMade, emailedTo){
   const safe = safeUrl(url) || '';
+  // If the email went, their inbox is the way back in on any device. If it did
+  // not, this modal is the only copy of the link and they need telling.
+  const made = !justMade ? ''
+    : emailedTo
+      ? banner('ok', 'bi-envelope-check', `Saved, and sent to <b>${esc(emailedTo)}</b> — that email has a link that opens this demo with you still in control, on any device.`)
+      : banner('warn', 'bi-exclamation-triangle', 'Saved — but we could not email it to you. <b>Copy the link now and keep it safe:</b> this browser is the only place it is stored.');
   openModal({title:justMade ? 'Your demo link is ready' : 'Your demo link', body:`
-    ${justMade ? banner('ok', 'bi-check2-circle', 'Saved. Anyone with this link can open the demo — they give their name first, so you know who has seen it.') : ''}
+    ${made}
     <div class="fld"><label for="sh-url">The link</label><input id="sh-url" readonly value="${esc(url)}"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
       <button class="btn btn-primary btn-sm" data-action="sh-copy" data-url="${esc(url)}"><i class="bi bi-clipboard"></i> Copy the link</button>
       ${safe ? `<a class="btn btn-sm" href="${esc(safe)}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Open it</a>` : ''}
       ${owner ? `<button class="btn btn-sm" data-action="sh-save"><i class="bi bi-arrow-repeat"></i> Update it with my latest changes</button>` : ''}
       <button class="btn btn-sm" data-action="sh-meeting"><i class="bi bi-calendar-check"></i> Book the discovery meeting</button></div>
-    <p class="small muted" style="margin:15px 0 0;line-height:1.65">Send it to anyone who should see it. Keep editing here and press
-      <b>Update it</b> whenever you want the link to show your newest version. The link lasts ${esc(String(shareCfg().ttl_days || 90))} days.</p>`});
+    <p class="small muted" style="margin:15px 0 0;line-height:1.65">This is the link to <b>pass on</b> — whoever opens it can look at everything and try their own
+      changes, but cannot alter your version. Keep editing here and press <b>Update it</b> whenever you want the link to show your newest version.
+      The link lasts ${esc(String(shareCfg().ttl_days || 90))} days.</p>`});
 }
 ACTIONS['sh-copy'] = async t => {
   try { await navigator.clipboard.writeText(t.dataset.url); toast('Link copied.', 'ok'); }
@@ -3171,7 +3178,7 @@ ACTIONS['sh-fork'] = async () => {
     history.replaceState(null, '', location.pathname + '?demo=' + encodeURIComponent(d.slug));
     addLog('saved an own copy of the shared demo', {view:'journey', meta:''}, 'bi-files', {old:'read-only copy', new:'my own link', reason:'Edited for our context'});
     saveState();
-    shareLinkModal(d.url, true, true);
+    shareLinkModal(d.url, true, true, d.emailed ? d.email : null);
     redraw();
   } catch(e){ toast(e.message, 'bad'); }
 };
@@ -3196,9 +3203,13 @@ const JOURNEY = [
   ['Adoption', 'We walk the journey with you until the system is fully adopted across your team.'],
   ['Your own consultant', 'You get a dedicated consultant for support on both the technology and the M&E.']
 ];
-/* Which step the visitor is standing on: reviewing a demo is step two, and a
-   demo that has not been shared yet means the documents are already in. */
-const journeyNow = () => isSample() ? 1 : 2;
+/* Which step the visitor is standing on. A demo with a link carries its stage
+   from the server, which moves by itself as far as the evidence goes and is set
+   by Vantage after that. Without a link we can only tell the first two apart. */
+const journeyNow = () => {
+  const st = Number(sh() && sh().meta && sh().meta.stage);
+  return st >= 1 && st <= JOURNEY.length ? st : (isSample() ? 1 : 2);
+};
 
 VIEW_RENDERERS['journey'] = () => {
   const now = journeyNow(), s = sh(), o = appData.org, viewer = shRole() === 'viewer';
@@ -3225,7 +3236,8 @@ VIEW_RENDERERS['journey'] = () => {
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:13px">
         <button class="btn btn-sm btn-primary" data-action="sh-copy" data-url="${esc(shareUrlOf(s))}"><i class="bi bi-clipboard"></i> Copy</button>
         <button class="btn btn-sm" data-action="sh-save"><i class="bi bi-arrow-repeat"></i> Update with my latest changes</button></div>
-      <p class="small muted" style="margin:13px 0 0;line-height:1.6">Everyone who opens it gives their name first, so you know who has reviewed it.</p>`)
+      <p class="small muted" style="margin:13px 0 0;line-height:1.6">Everyone who opens it gives their name first, so you know who has reviewed it.
+        We emailed you a separate link that opens this demo with you still in control — use that one to pick it up on another device.</p>`)
     : viewer
       ? card('This demo was prepared for you', `<p class="small" style="margin:0;line-height:1.7;color:var(--ink-soft)">
           You are looking at ${esc(o ? o.name : 'this organisation')} in Eval360. Change anything you like — targets, tolerance, branding — it only affects your view.

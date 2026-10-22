@@ -33,6 +33,19 @@ if (!hash_equals($cfg['admin_key'], $given)) {
     exit("Not found.\n");
 }
 
+/* Only Vantage knows when a contract is signed or a team is trained, so the
+   later steps are set here. Post/redirect/get, so a refresh does not resend. */
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $slug = (string) ($_POST['slug'] ?? '');
+    $stage = (int) ($_POST['stage'] ?? 0);
+    if (lf_share_find($slug) && isset(LF_SHARE_STAGES[$stage])) {
+        lf_share_stage($slug, $stage, true);          // forced: Vantage may move it back as well as on
+        lf_share_event($slug, 'staged', LF_SHARE_STAGES[$stage]);
+    }
+    header('Location: ?key=' . urlencode($given) . '#d-' . $slug);
+    exit;
+}
+
 $demos = lf_share_all(200);
 $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 $when = function (?string $iso): string {
@@ -60,12 +73,13 @@ if (($_GET['csv'] ?? '') === 'leads') {
     exit;
 }
 
-$totals = ['demos' => count($demos), 'leads' => 0, 'opens' => 0, 'forks' => 0, 'meetings' => 0];
+$totals = ['demos' => count($demos), 'leads' => 0, 'opens' => 0, 'forks' => 0, 'meetings' => 0, 'past3' => 0];
 foreach ($demos as $d) {
     $totals['leads'] += count($d['leads'] ?? []);
     $totals['opens'] += (int) ($d['opens'] ?? 0);
     $totals['forks'] += count($evOf($d, 'forked'));
     $totals['meetings'] += count($evOf($d, 'meeting'));
+    if ((int) ($d['stage'] ?? 2) >= 4) $totals['past3']++;
 }
 
 $base = rtrim(str_replace('\\', '/', dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/pipeline.php'))), '/');
@@ -103,6 +117,8 @@ header('X-Robots-Tag: noindex, nofollow');
   .tag.hot{background:#e7f5ee;color:var(--ok)} .tag.warn{background:#fdf3e0;color:var(--warn)}
   a{color:var(--brand)} .r{text-align:right;white-space:nowrap}
   .ev{font-size:12.5px;color:var(--mute);margin-top:9px;line-height:1.8}
+  .stageform select{font:inherit;font-size:12.5px;padding:4px 7px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+  .stage{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px;background:#eaf0f6;color:var(--brand);margin-left:4px}
   .empty{background:#fff;border:1px dashed var(--line);border-radius:10px;padding:34px;text-align:center;color:var(--mute)}
   .tools{margin-bottom:18px;font-size:13px}
   code{background:#eef2f6;padding:1px 5px;border-radius:4px;font-size:12px}
@@ -118,6 +134,7 @@ header('X-Robots-Tag: noindex, nofollow');
   <div class="c"><b><?= (int) $totals['opens'] ?></b><span>Opens</span></div>
   <div class="c"><b><?= (int) $totals['forks'] ?></b><span>Edited copies</span></div>
   <div class="c"><b><?= (int) $totals['meetings'] ?></b><span>Meeting clicks</span></div>
+  <div class="c"><b><?= (int) $totals['past3'] ?></b><span>Past the demo</span></div>
 </div>
 
 <div class="tools">
@@ -136,12 +153,14 @@ header('X-Robots-Tag: noindex, nofollow');
     $meetings = $evOf($d, 'meeting');
     $events = array_reverse($d['events'] ?? []);
     $labels = ['created' => 'built', 'opened' => 'opened', 'gated' => 'gave contact', 'edited' => 'revised',
-               'forked' => 'saved own copy', 'meeting' => 'asked for a meeting', 'exported' => 'exported a report'];
+               'forked' => 'saved own copy', 'meeting' => 'asked for a meeting', 'exported' => 'exported a report',
+               'staged' => 'moved on'];
 ?>
-<div class="d">
+<div class="d" id="d-<?= $e($d['slug']) ?>">
   <div class="dh">
     <div>
       <b><?= $e($d['org_name'] !== '' ? $d['org_name'] : 'Untitled demo') ?></b>
+      <span class="stage">Step <?= (int) ($d['stage'] ?? 2) ?> · <?= $e(LF_SHARE_STAGES[(int) ($d['stage'] ?? 2)] ?? '') ?></span>
       <?php if ($meetings): ?> <span class="tag hot">Meeting requested</span><?php endif; ?>
       <?php if (!empty($d['parent'])): ?> <span class="tag">Edited copy</span><?php endif; ?>
       <div class="meta"><?= (int) $d['programmes'] ?> programme<?= (int) $d['programmes'] === 1 ? '' : 's' ?>
@@ -151,8 +170,19 @@ header('X-Robots-Tag: noindex, nofollow');
         · expires <?= $e(gmdate('j M Y', (int) strtotime((string) $d['expires_at']))) ?></div>
     </div>
     <div class="r meta">
-      <a href="<?= $e($demoUrl($d)) ?>" target="_blank" rel="noopener">Open</a> &nbsp;
-      <a href="<?= $e($demoUrl($d)) ?>&amp;t=<?= $e($d['edit_token']) ?>" target="_blank" rel="noopener"><b>Open to revise</b></a>
+      <form method="post" action="?key=<?= urlencode($given) ?>" class="stageform">
+        <input type="hidden" name="slug" value="<?= $e($d['slug']) ?>">
+        <select name="stage" onchange="this.form.submit()" aria-label="Stage for <?= $e($d['org_name']) ?>">
+          <?php foreach (LF_SHARE_STAGES as $k => $label): ?>
+            <option value="<?= (int) $k ?>"<?= (int) ($d['stage'] ?? 2) === (int) $k ? ' selected' : '' ?>><?= (int) $k ?> · <?= $e($label) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <noscript><button type="submit">Set</button></noscript>
+      </form>
+      <div style="margin-top:7px">
+        <a href="<?= $e($demoUrl($d)) ?>" target="_blank" rel="noopener">Open</a> &nbsp;
+        <a href="<?= $e($demoUrl($d)) ?>&amp;t=<?= $e($d['edit_token']) ?>" target="_blank" rel="noopener"><b>Open to revise</b></a>
+      </div>
     </div>
   </div>
 

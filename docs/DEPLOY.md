@@ -67,6 +67,7 @@ Everything here is optional — a link works with none of it set — but two set
 | Setting | What it does |
 |---|---|
 | `SHARE_NOTIFY_EMAIL` | Emailed on each new demo, each first open and each meeting click. Without it nothing is sent, and `api/pipeline.php` is the only way to see activity. |
+| `SHARE_NOTIFY_FROM` | The From: address on mail to visitors — **set this one properly** (see below). |
 | `SHARE_ADMIN_KEY` | 16+ characters. Opens `api/pipeline.php?key=…`: who built a demo, who opened it, who asked for a meeting, contacts as CSV. Unset, that page is a 404. |
 | `SHARE_MEETING_URL` | The booking page for the discovery meeting. Without it the demo shows the email and phone instead. |
 | `SHARE_TTL_DAYS` | How long a link lasts before it is **deleted** (default 90). |
@@ -82,6 +83,19 @@ nano /home/vantage/domains/eval360.tech/private/logframe.env
 Generate the key with `openssl rand -hex 24`. Set a monthly spending limit in the OpenAI dashboard as
 before — a demo link makes no AI call, but the visitor who opens it can use Ask Eval360 and the report
 writer, and those do.
+
+**Email has to work, or people cannot get back in.** There is no login: when someone builds a demo we
+email them their own link, and that email is the only copy of it outside the browser they made it in. It
+goes out with PHP's `mail()`.
+
+- Set `SHARE_NOTIFY_FROM` to a real address **on this domain** (`no-reply@eval360.tech`), not a Gmail
+  address — a From: the domain's SPF record does not authorise is what sends a message to spam.
+- Check SPF and DKIM for the domain cover the server that sends it.
+- Send yourself a demo and confirm it arrives in the inbox, not the spam folder, before the first prospect
+  sees the site.
+
+If `mail()` is unavailable or refused, nothing breaks: the demo tells the visitor plainly that it could
+not email the link and to copy it now. But they lose the demo if they ignore that, so it is worth getting right.
 
 **What a link stores.** The reviewed framework — results, indicators, baselines and targets as the visitor
 accepted them — so the link can open it. Uploaded PDFs, Word and Excel files are still never saved.
@@ -107,7 +121,10 @@ curl -s -o /dev/null -w 'key     %{http_code}\n' "https://mel.eval360.tech/logfr
 Then open the site and set up a real organisation: enter a name and its website, choose **Upload our
 logframe** for one programme (try `samples/sample_logframe.pdf`) and **AI drafts one** for another.
 Finally press **Share this demo**, open the link it gives you in a private window, and check the contact
-form appears and the demo opens behind it. The demo should then show up in `api/pipeline.php?key=…`.
+form appears and the demo opens behind it. The demo should then show up in `api/pipeline.php?key=…`, where
+you can also move it along the seven steps. Check the email arrived, and that the `&t=…` link in it opens
+the demo with **Share this demo** in the top bar — that is the test that someone can come back to their
+own demo on another machine.
 
 If the PDF upload fails with "arrived empty", the host's `post_max_size` is below the PDF size — raise it
 to 16M in the PHP settings for the domain, or lower `AI_MAX_PDF_MB`.

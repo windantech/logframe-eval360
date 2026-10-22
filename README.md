@@ -35,6 +35,9 @@ in their browser until they **save their own copy**, which gives them a link of 
 as it was. You can revise your link in place at any time, and **How we work** lays out the seven steps from
 first document to a system your team has adopted.
 
+There is no account to make. We email you your link when you create it: one that opens the demo with you
+still in control on any device, and one to pass on. Keep the first, send the second.
+
 What a link stores: the reviewed framework — results, indicators, baselines and targets as you accepted them —
 and nothing else. Uploaded PDFs, Word and Excel files are still never saved. Links are deleted after 90 days.
 

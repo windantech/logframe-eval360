@@ -115,6 +115,13 @@ wording; `VIEW_RENDERERS['journey']` is the screen.
   issues a `pass` (an HMAC of slug and contact id) so it asks once, and a forged pass gates again.
 - A viewer edits freely in their own browser; **fork** gives them their own link and leaves the original
   untouched. Only the edit token can change a demo in place.
+- **There is no login — the link is the credential**, so the creator is emailed theirs
+  (`lf_share_owner_mail()`): their own link carrying `&t=`, and separately the link to pass on, with the
+  difference spelled out. Without that email the edit token exists only in the browser that made it, and
+  closing the tab loses the demo. If `mail()` fails the modal says so and tells them to copy the link.
+- **Stage** (`LF_SHARE_STAGES`, 1–7) is where a prospect has got to. Evidence moves it forward only —
+  created sets 2, a meeting click sets 3 — and Vantage sets 4–7 from the pipeline page, which may also
+  move it back (`$force`). `journeyNow()` reads it so the visitor sees their own progress.
 - Storage is one JSON file per demo under `flock` — the same pattern as `lf_quota()`, chosen so a
   deployment never has to touch a database connection or an env file. The `lf_share_*` functions are the
   seam if it ever outgrows that.

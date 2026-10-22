@@ -189,6 +189,8 @@ function lf_share_create(array $payload, ?array $lead, ?string $parent = null): 
         'opens' => 0,
         'last_open_at' => null,
         'ip_hash' => lf_client_id(),
+        'stage' => 2,
+        'stage_at' => $now,
         'lead_seq' => 0,
         'leads' => [],
         'events' => [],
@@ -268,7 +270,7 @@ function lf_share_lead(string $slug, string $kind, array $in): ?int
     return $id;
 }
 
-const LF_SHARE_EVENTS = ['created', 'opened', 'gated', 'edited', 'forked', 'meeting', 'exported'];
+const LF_SHARE_EVENTS = ['created', 'opened', 'gated', 'edited', 'forked', 'meeting', 'exported', 'staged'];
 const LF_SHARE_EVENT_CAP = 400;
 
 function lf_share_event(string $slug, string $kind, string $detail = '', ?int $leadId = null): void
@@ -334,6 +336,97 @@ function lf_share_notify(string $subject, array $lines): void
     $headers = ['Content-Type: text/plain; charset=utf-8'];
     if ($cfg['notify_from']) $headers[] = 'From: Eval360 demos <' . $cfg['notify_from'] . '>';
     @mail($cfg['notify'], '[Eval360 demo] ' . $subject, $body, implode("\r\n", $headers));
+}
+
+/* ═══ Where a prospect has got to ══════════════════════════════════════════
+   The seven steps, as a number on the demo. It moves by itself as far as the
+   evidence goes — built, then a meeting asked for — and Vantage sets the rest
+   from the pipeline page, because only Vantage knows when a contract is
+   signed. It never slides backwards on its own. */
+const LF_SHARE_STAGES = [
+    1 => 'Documents shared',
+    2 => 'Demo to review',
+    3 => 'Discovery meeting',
+    4 => 'Contract',
+    5 => 'Live',
+    6 => 'Adoption',
+    7 => 'Dedicated consultant',
+];
+
+function lf_share_stage(string $slug, int $stage, bool $force = false): void
+{
+    if (!isset(LF_SHARE_STAGES[$stage])) return;
+    lf_share_edit($slug, function (array $d) use ($stage, $force) {
+        $now = (int) ($d['stage'] ?? 2);
+        if (!$force && $stage <= $now) return null;          // evidence only ever moves it forward
+        $d['stage'] = $stage;
+        $d['stage_at'] = gmdate('c');
+        return $d;
+    });
+}
+
+/* ═══ Telling the prospect, not just Vantage ═══════════════════════════════
+   Without this the only copy of a demo link is a browser tab. Close it and the
+   demo is unreachable, because the edit token lives in that browser alone.
+   The email carries both links and is explicit about the difference: one keeps
+   them in control, the other is the one to pass on. */
+function lf_share_mail_owner(array $lead, string $orgName, int $programmes, string $shareUrl, string $ownerUrl, bool $isCopy = false): bool
+{
+    $cfg = lf_share_config();
+    if (!function_exists('mail') || !filter_var($lead['email'] ?? '', FILTER_VALIDATE_EMAIL)) return false;
+    [$subject, $body] = lf_share_owner_mail($lead, $orgName, $programmes, $shareUrl, $ownerUrl, $isCopy);
+
+    $headers = ['Content-Type: text/plain; charset=utf-8'];
+    if ($cfg['notify_from']) $headers[] = 'From: Eval360 <' . $cfg['notify_from'] . '>';
+    if ($cfg['contact_email']) $headers[] = 'Reply-To: ' . $cfg['contact_email'];
+
+    return @mail($lead['email'], $subject, $body, implode("\r\n", $headers));
+}
+
+/** Subject and body, apart from the sending, so the wording can be tested. */
+function lf_share_owner_mail(array $lead, string $orgName, int $programmes, string $shareUrl, string $ownerUrl, bool $isCopy = false): array
+{
+    $cfg = lf_share_config();
+    $who = $orgName !== '' ? $orgName : 'your organisation';
+    $lines = [
+        'Hello ' . $lead['name'] . ',',
+        '',
+        $isCopy
+            ? 'Here is your own copy of the Eval360 demo, with the changes you made.'
+            : 'Here is the Eval360 demo you just set up for ' . $who . ' — ' . $programmes . ' programme' . ($programmes === 1 ? '' : 's') . ', with dashboards, logframe matrix, indicators and reports.',
+        '',
+        'YOUR LINK — keep this one',
+        $ownerUrl,
+        'Opens the demo with you in control, on any device. You can keep editing it and',
+        'everyone who already has the sharing link below will see your changes. Do not',
+        'forward this one: anyone who opens it can change your demo.',
+        '',
+        'THE LINK TO SHARE',
+        $shareUrl,
+        'Send this to colleagues. They can look at everything and try their own changes,',
+        'but they cannot alter your version.',
+        '',
+        'Both links stop working after ' . $cfg['ttl_days'] . ' days and the demo is then deleted.',
+        '',
+        'When you have had a look, the next step is a discovery meeting: we go through',
+        'what you have seen and adjust the demo to how your organisation actually works.',
+    ];
+    if ($cfg['meeting_url']) { $lines[] = ''; $lines[] = 'Book it here: ' . $cfg['meeting_url']; }
+    if ($cfg['contact_email']) {
+        $lines[] = '';
+        $lines[] = 'Any questions, just reply, or write to ' . $cfg['contact_email'] . ($cfg['contact_phone'] ? ' / ' . $cfg['contact_phone'] : '') . '.';
+    }
+    $lines[] = '';
+    $lines[] = 'Eval360 — monitoring, evaluation and learning';
+
+    return ['Your Eval360 demo' . ($orgName !== '' ? ' — ' . $orgName : ''), implode("\n", $lines) . "\n"];
+}
+
+/* The link that keeps its holder in control. It carries the edit token, so it
+   is the one thing that must never be treated as the sharing link. */
+function lf_share_owner_url(string $slug, string $token): string
+{
+    return lf_share_public_url($slug) . '&t=' . $token;
 }
 
 function lf_share_public_url(string $slug): string
