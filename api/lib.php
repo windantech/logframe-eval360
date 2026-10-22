@@ -86,9 +86,13 @@ function lf_fail(string $message, int $status = 400, string $code = 'error'): ne
 /* ── Storage (rate limits, usage log) — outside git, blocked from the web ─ */
 function lf_storage(string $sub): string
 {
-    $dir = LF_ROOT . '/storage/' . $sub;
+    // LF_STORAGE_DIR moves the whole store: the e2e test points it at a
+    // temporary directory so a test run leaves nothing behind, and a host with
+    // a read-only application directory can put it on a writable volume.
+    $root = lf_env('LF_STORAGE_DIR') ?: (LF_ROOT . '/storage');
+    $dir = $root . '/' . $sub;
     if (!is_dir($dir)) @mkdir($dir, 0775, true);
-    $guard = LF_ROOT . '/storage/.htaccess';
+    $guard = $root . '/.htaccess';
     if (!is_file($guard)) @file_put_contents($guard, "Require all denied\nDeny from all\n");
     return $dir;
 }

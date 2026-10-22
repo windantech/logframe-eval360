@@ -30,12 +30,16 @@ api/draft.php                POST — organisation + programme in, drafted frame
 api/lib_ai.php               Ask Eval360 and report-writer prompts, report schema, mocks, context limits
 api/ask.php                  POST — question + history + organisation data in, markdown answer out
 api/report.php               POST — report type, audience, length + organisation data in, structured report out
-api/status.php               GET  — is AI on, requests left today (never the key)
+api/status.php               GET  — is AI on, can a demo be shared, requests left today (never the key)
+api/lib_share.php            the demo-link store: one JSON file per demo under storage/, flock'd
+api/share.php                POST — create / open / unlock / save / fork / event for a demo link
+api/pipeline.php             GET  — who built, opened and asked for a meeting (SHARE_ADMIN_KEY only)
 samples/                     sample logframe as CSV, DOCX, PDF — for visitors to try an upload
 tests/e2e.js                 end-to-end harness, injected only by scripts/e2e.sh — never shipped
 tests/fixture_site/          a fictional NGO website the e2e test reads
 scripts/                     selftest.sh, e2e.sh, deploy_pull.sh
-storage/                     created at runtime: rate limits, usage log — gitignored, web-blocked
+storage/                     created at runtime: rate limits, usage log, shared demos — gitignored,
+                             web-blocked; LF_STORAGE_DIR moves it (the e2e test points it at a temp dir)
 ```
 
 ## Kinds of data — never mixed silently
@@ -90,6 +94,33 @@ outcome-level indicators of the programmes linked to them.
 - `AI_MOCK=1` returns a fixed extraction without calling OpenAI — for local testing.
 - Usage log has tokens and timings only, never content.
 
+## Demo links — step two of the sales process
+
+The seven steps the demo is built around: 1 share your documents · 2 **we build your demo and send you a
+link to review it** · 3 discovery meeting and revise the demo to your context · 4 contract (50% up front,
+50% after four months) · 5 go live, credentials, data migration, training · 6 walk the journey to full
+adoption · 7 a dedicated consultant for tech and M&E. `JOURNEY` in the page holds the customer-facing
+wording; `VIEW_RENDERERS['journey']` is the screen.
+
+- **A link stores the reviewed set-up and nothing else.** `lf_share_clean()` keeps only what `saveState()`
+  keeps, drops `setup` (where uploads live) and strips `source.text`/`payload` from every programme. The
+  e2e test asserts no document content reaches the store. Uploaded PDFs, Word and Excel are still never saved.
+- The slug is the credential: 12 base32 characters (60 bits), Crockford's alphabet so it can be read aloud.
+  The **edit token** is separate and is what lets a demo be revised in place; it is banked in
+  `eval360.links.v1` and taken straight out of the address bar on arrival.
+- **A shared payload was built in another browser**, so `sanitiseShared()` re-applies `safeUrl`, `safeImg`
+  and `hexOk` on adoption, and `shareUrlOf()` never returns a URL that did not pass `safeUrl`. The
+  self-test renders the gate, journey and settings screens with markup and `javascript:` URLs throughout.
+- **Nobody opens a link anonymously** (unless `SHARE_GATE=0`): the gate takes name and email, the server
+  issues a `pass` (an HMAC of slug and contact id) so it asks once, and a forged pass gates again.
+- A viewer edits freely in their own browser; **fork** gives them their own link and leaves the original
+  untouched. Only the edit token can change a demo in place.
+- Storage is one JSON file per demo under `flock` — the same pattern as `lf_quota()`, chosen so a
+  deployment never has to touch a database connection or an env file. The `lf_share_*` functions are the
+  seam if it ever outgrows that.
+- Expiry is deletion, not archiving: `SHARE_TTL_DAYS` (90), swept on roughly one write in twenty.
+- `api/pipeline.php` shows names, organisations, opens and meeting clicks — never the stored framework.
+
 ## Ask Eval360 and the AI report writer
 
 - The browser builds the data the AI sees with `aiContext(scope)`: organisation, goals, and per programme the
@@ -109,8 +140,10 @@ outcome-level indicators of the programmes linked to them.
 - No `</script>` inside the inline script (write `<\/script>`): it ends the block.
 - The page contains `</body>` inside a JS string (the report template); anything that injects
   before `</body>` must use the **last** occurrence.
-- State persists in `localStorage` only (`eval360.org.v2`), wrapped in try/catch, never with file
-  contents; "Start over" clears it. First visit opens the set-up wizard with the sample loaded behind it.
+- State persists in `localStorage` (`eval360.org.v2`), wrapped in try/catch, never with file contents;
+  "Start over" clears it. First visit opens the set-up wizard with the sample loaded behind it. A demo
+  opened from a link goes through the same `hydrate()` as a saved one, so it behaves identically.
+  `eval360.links.v1` is deliberately separate: "Start over" must not lose a link already sent to someone.
 - Branding: `brandTokens()` derives brand / deep / soft from one colour and darkens colours too light to read.
 - Reports open via Blob URL with a Print / Save as PDF button.
 
@@ -124,4 +157,5 @@ bash scripts/e2e.sh        # website → profile → upload + draft → review �
 1. Both tests pass before every commit.
 2. Changing a schema: update the schema, its instructions, its mock, the sample (`SAMPLE_PROFILE`,
    `SAMPLE_FRAMEWORKS`) and the normaliser (`normaliseOrg`, `normaliseFramework`) together.
-3. Never log or display document content server-side.
+3. Never log or display document content server-side. A stored demo is the one thing the server keeps,
+   and even that is the reviewed framework only — never the document it came from.

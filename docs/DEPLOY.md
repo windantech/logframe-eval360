@@ -56,19 +56,58 @@ Changes take effect immediately — no restart.
 **Also set a monthly spending limit in the OpenAI dashboard** (Settings → Limits). The daily caps
 protect against abuse; the OpenAI limit is the hard stop.
 
+## 3b · Demo links — step two of the sales process
+
+Sharing needs nothing installed: demos are JSON files under `storage/share/`, written with `flock`. No
+database, no credentials, **no change to any connection string or env file on deploy**. Confirm the
+directory is writable by the web user (it is created on first use, alongside `storage/ratelimit`).
+
+Everything here is optional — a link works with none of it set — but two settings are worth having:
+
+| Setting | What it does |
+|---|---|
+| `SHARE_NOTIFY_EMAIL` | Emailed on each new demo, each first open and each meeting click. Without it nothing is sent, and `api/pipeline.php` is the only way to see activity. |
+| `SHARE_ADMIN_KEY` | 16+ characters. Opens `api/pipeline.php?key=…`: who built a demo, who opened it, who asked for a meeting, contacts as CSV. Unset, that page is a 404. |
+| `SHARE_MEETING_URL` | The booking page for the discovery meeting. Without it the demo shows the email and phone instead. |
+| `SHARE_TTL_DAYS` | How long a link lasts before it is **deleted** (default 90). |
+| `SHARE_LIMIT_PER_IP_DAY` | Links one visitor may create a day (default 10). No AI call is made, so this is its own cap. |
+
+```bash
+nano /home/vantage/domains/eval360.tech/private/logframe.env
+# SHARE_NOTIFY_EMAIL=eval360@vantageafricaleaders.com
+# SHARE_ADMIN_KEY=<openssl rand -hex 24>
+# SHARE_MEETING_URL=https://…
+```
+
+Generate the key with `openssl rand -hex 24`. Set a monthly spending limit in the OpenAI dashboard as
+before — a demo link makes no AI call, but the visitor who opens it can use Ask Eval360 and the report
+writer, and those do.
+
+**What a link stores.** The reviewed framework — results, indicators, baselines and targets as the visitor
+accepted them — so the link can open it. Uploaded PDFs, Word and Excel files are still never saved.
+Everyone who opens a link gives their name and email first (`SHARE_GATE=0` turns that off).
+`SHARE_DISABLE=1` switches the whole feature off, and the demo hides it.
+
 ## 4 · Check it
 
 ```bash
-# Must say "ai": true
+# Must say "ai": true, and "share": {"enabled": true, …}
 curl -s https://mel.eval360.tech/logframe/api/status.php
 
 # Must all be 403 or 404 — never 200
-for p in .env .env.example api/lib.php api/lib_web.php api/lib_org.php api/lib_ai.php storage/ tests/ .git/config; do
+for p in .env .env.example api/lib.php api/lib_web.php api/lib_org.php api/lib_ai.php api/lib_share.php \
+         storage/ storage/share/demos/ tests/ .git/config; do
   echo "$p $(curl -s -o /dev/null -w '%{http_code}' https://mel.eval360.tech/logframe/$p)"; done
+
+# The pipeline page: 404 without the key, 200 with it
+curl -s -o /dev/null -w 'no key  %{http_code}\n' "https://mel.eval360.tech/logframe/api/pipeline.php?key=wrong"
+curl -s -o /dev/null -w 'key     %{http_code}\n' "https://mel.eval360.tech/logframe/api/pipeline.php?key=$SHARE_ADMIN_KEY"
 ```
 
 Then open the site and set up a real organisation: enter a name and its website, choose **Upload our
 logframe** for one programme (try `samples/sample_logframe.pdf`) and **AI drafts one** for another.
+Finally press **Share this demo**, open the link it gives you in a private window, and check the contact
+form appears and the demo opens behind it. The demo should then show up in `api/pipeline.php?key=…`.
 
 If the PDF upload fails with "arrived empty", the host's `post_max_size` is below the PDF size — raise it
 to 16M in the PHP settings for the domain, or lower `AI_MAX_PDF_MB`.
@@ -102,6 +141,9 @@ usage log has the real token counts). Every call is logged — date, hashed visi
 ## Privacy, in one paragraph
 
 Website pages and the visitor's documents are sent to OpenAI through this server and are not stored here.
+If a visitor asks for a demo link, the set-up they reviewed is stored under `storage/share/` so the link can
+open it, together with the name, email and organisation of everyone who opens that link; it is all deleted
+when the link expires. The documents the set-up was extracted from are still never stored.
 The website reader refuses private and internal addresses, so it cannot be used to probe the server's network. Requests are
 sent with `store: false`. The set-up lives only in the visitor's browser. The set-up
 screen tells visitors this, and not to upload documents they may not share with a third-party AI service.

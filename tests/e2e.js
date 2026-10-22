@@ -108,6 +108,90 @@ if (location.hash === '#e2e') (async () => {
     ok('Report: Word and text exports build', rwDocument(rep, false).includes('<h1>') && rwText(rep).includes('RECOMMENDATIONS'));
     const kept = JSON.parse(localStorage.getItem(STORE_KEY));
     ok('Conversation and report kept in this browser', kept.chat.length === 4 && kept.aiReports.length === 1);
+    // ── The demo link: step two of how we work ──────────────────────────────
+    const ADMIN_KEY = 'e2e-pipeline-key-0123456789';
+    await im_checkStatus();
+    ok('Status endpoint reports sharing available', shareOn() === true && shareCfg().ttl_days > 0);
+    ok('Share button is offered for a real organisation, not the sample', shareable() === true);
+    const cf = new FormData();
+    cf.set('name', 'Amina Phiri'); cf.set('email', 'amina@kijani.example'); cf.set('org', 'Kijani Water Trust'); cf.set('role', 'M&E Lead');
+    const cform = document.createElement('form'); cform.innerHTML = '<button type="submit"></button>';
+    await SUBMITS['sh-create-form'](cform, cf);
+    const slug = appData.share && appData.share.slug;
+    ok('Link created and this browser owns it', !!slug && /^[a-z0-9]{12}$/.test(slug) && shRole() === 'owner' && !!appData.share.editToken, slug || 'none');
+    ok('The link is remembered apart from the set-up, so Start over cannot lose it', linkToken(slug) === appData.share.editToken);
+    ok('Audit trail records the link', appData.log.some(e => /created a link/.test(e.text)));
+    closeModal();
+
+    // What actually reached the server
+    const stored = await shareApi('open', {slug, edit_token:appData.share.editToken});
+    const stxt = JSON.stringify(stored.payload);
+    ok('Stored set-up carries the reviewed framework', stored.payload.org.name === 'Kijani Water Trust' && stored.payload.programmes.length === appData.programmes.length);
+    ok('Stored set-up carries no document content and no wizard state',
+      !stxt.includes('file_base64') && !stxt.includes('Apprenticeships completed | apprenticeships') && stored.payload.setup === undefined,
+      stxt.length + ' bytes');
+
+    // A stranger follows the link: the contact form comes first
+    appData.share = {slug, role:null, editToken:null, pass:null, loading:false, gate:null};
+    const g = await shareApi('open', {slug});
+    ok('A stranger is asked who they are before the demo opens', g.gate === true && g.payload === undefined && g.org_name === 'Kijani Water Trust');
+    appData.share.gate = {org_name:g.org_name, programmes:g.programmes};
+    showView('gate');
+    ok('Gate screen names the organisation and is the only thing on it',
+      /Kijani Water Trust/.test(document.querySelector('.gate h1').textContent) && document.querySelectorAll('.gate form input[required]').length === 2);
+    let refused = null;
+    try { await shareApi('unlock', {slug, lead:{name:'Boniface Zulu', email:'not-an-email'}}); } catch(e){ refused = e.message; }
+    ok('Gate refuses a contact it could not reply to', !!refused && /email/i.test(refused), refused || 'accepted');
+    const gfd = new FormData();
+    gfd.set('name', 'Boniface Zulu'); gfd.set('email', 'bz@donor.example'); gfd.set('org', 'Donor Fund'); gfd.set('role', 'Portfolio manager');
+    await SUBMITS['gate-form'](document.createElement('form'), gfd);
+    ok('Contact given, demo opens as the viewer', shRole() === 'viewer' && currentView === 'dashboard' && !!appData.share.pass && !document.body.classList.contains('gated'));
+    ok('The viewer sees the organisation the link was built for', appData.org.name === 'Kijani Water Trust' && appData.programmes.length === 4);
+    ok('Illustrative figures are the same ones the owner saw', appData.results.length > 0 && appData.results.every(r => r.source_type === 'ILLUSTRATIVE'));
+    updateChrome();
+    const strip = document.getElementById('shared-strip');
+    ok('A strip tells the viewer this was built for them, and offers the meeting',
+      strip.style.display !== 'none' && /built for/.test(strip.textContent) && !!strip.querySelector('[data-action="sh-meeting"]'));
+    showView('journey');
+    ok('How we work shows all seven steps and marks where the visitor is',
+      document.querySelectorAll('.jrny .st').length === 7 && document.querySelectorAll('.jrny .st.now .nowtag').length === 1);
+    ok('A returning viewer is not asked for their contact twice',
+      (await shareApi('open', {slug, pass:appData.share.pass})).gate === undefined);
+
+    // The viewer edits and keeps their own copy; the one they were sent is untouched
+    const before = appData.share.pass;
+    appData.settings.tolerance = 20;
+    await ACTIONS['sh-fork']();
+    closeModal();
+    const mine = appData.share.slug;
+    ok('The viewer keeps an editable copy of their own', shRole() === 'owner' && mine !== slug && !!appData.share.editToken, mine);
+    ok('The demo they were sent is unchanged', (await shareApi('open', {slug, pass:before})).payload.settings.tolerance === 10);
+    ok('Their copy holds their edit', (await shareApi('open', {slug:mine, edit_token:appData.share.editToken})).payload.settings.tolerance === 20);
+
+    // The owner revises the link in place for the discovery meeting
+    appData.settings.tolerance = 15;
+    await ACTIONS['sh-save']();
+    ok('The owner revises the link in place', appData.share.meta.revision === 2 &&
+      (await shareApi('open', {slug:mine, edit_token:appData.share.editToken})).payload.settings.tolerance === 15);
+    let notMine = null;
+    try { await shareApi('save', {slug, edit_token:'0'.repeat(32), payload:sharePayload()}); } catch(e){ notMine = e.message; }
+    ok('A demo cannot be changed without its own edit token', !!notMine, notMine || 'accepted');
+
+    // Step three
+    ok('A meeting click is recorded', (await shareApi('event', {slug:mine, kind:'meeting', pass:null})).ok === true);
+    ok('Unknown events are refused', await shareApi('event', {slug:mine, kind:'whatever'}).then(() => false, () => true));
+
+    // What Vantage sees
+    const pipe = await (await fetch('api/pipeline.php?key=' + encodeURIComponent(ADMIN_KEY))).text();
+    ok('Pipeline page lists the demo, both contacts and the meeting',
+      pipe.includes('amina@kijani.example') && pipe.includes('bz@donor.example') && pipe.includes('Meeting requested') && pipe.includes('Edited copy'));
+    ok('Pipeline page never shows the stored framework', !pipe.includes('Water points constructed') && !pipe.includes('safely managed drinking water'));
+    const csv = await (await fetch('api/pipeline.php?key=' + encodeURIComponent(ADMIN_KEY) + '&csv=leads')).text();
+    ok('Contacts download as CSV', csv.startsWith('first_seen_utc') && csv.includes('Boniface Zulu'));
+    ok('Pipeline page does not exist without the key', (await fetch('api/pipeline.php?key=wrong')).status === 404);
+    const dead = await shareApi('open', {slug:'zzzzzzzzzzzz'}).then(() => null, e => e.message);
+    ok('An unknown link says so plainly', !!dead && /expired|does not exist/.test(dead), dead || 'none');
+    appData.share = null;
   } catch(e){ out.push('FAIL exception — ' + (e && e.stack || e)); }
   const pre = document.createElement('pre'); pre.id = 'e2e'; pre.textContent = out.join('\n'); document.body.appendChild(pre);
 })();

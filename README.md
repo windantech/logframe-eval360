@@ -24,7 +24,19 @@ per programme, a verification workflow, framework quality, an audit trail and pr
 - **AI-drafted** goals, programmes and logframes are labelled as proposals everywhere.
 - Nothing goes live until **you review** the extraction.
 - **Progress, budget and reach figures are illustrative**, generated to show how Eval360 tracks results, and labelled.
-- Website pages and documents go to OpenAI through the server and are **not stored**; the set-up stays in your browser.
+- Website pages and documents go to OpenAI through the server and are **not stored**; the set-up stays in your browser —
+  until you ask for a **demo link**, which saves the reviewed set-up (not your documents) so the link can open it.
+
+## Sending the demo to someone
+
+**Share this demo** turns the set-up into an unguessable link. Whoever opens it gives their name and email
+first, then sees the whole demo and can change anything — targets, tolerance, branding. Their changes stay
+in their browser until they **save their own copy**, which gives them a link of their own and leaves yours
+as it was. You can revise your link in place at any time, and **How we work** lays out the seven steps from
+first document to a system your team has adopted.
+
+What a link stores: the reviewed framework — results, indicators, baselines and targets as you accepted them —
+and nothing else. Uploaded PDFs, Word and Excel files are still never saved. Links are deleted after 90 days.
 
 Without AI configured (or opened from disk) the demo still works with the built-in sample organisation.
 

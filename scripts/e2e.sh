@@ -9,15 +9,19 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT"
 CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
 [ -z "$CHROME" ] && { echo "Chrome or Chromium is required."; exit 2; }
-PORT=8799; SITEPORT=8811; T="_e2e_test.html"; TMPSTORE="$(mktemp -d)"
+PORT=8799; SITEPORT=8811; T="_e2e_test.html"; TMPSTORE="$(mktemp -d)"; STORE="$(mktemp -d)"
+# The demo links the test creates go in $STORE, not the checkout's storage/.
+E2E_ADMIN_KEY="e2e-pipeline-key-0123456789" 
 python3 - "$T" <<'PY'
 import sys; s = open('logframe_eval360_demo.html').read(); t = open('tests/e2e.js').read()
 i = s.rindex('</body>'); open(sys.argv[1], 'w').write(s[:i] + '<script>\n' + t + '\n</script>\n' + s[i:])   # the last </body>: the page also has one inside a JS string
 PY
 # AI_ALLOW_PRIVATE_FETCH lets the website reader reach the local fixture site — test only, never on a server.
-PHP_CLI_SERVER_WORKERS=4 AI_MOCK=1 AI_ALLOW_PRIVATE_FETCH=1 AI_LIMIT_PER_IP_DAY=100 php -S 127.0.0.1:$PORT -t . >/dev/null 2>&1 & PID=$!
+PHP_CLI_SERVER_WORKERS=4 AI_MOCK=1 AI_ALLOW_PRIVATE_FETCH=1 AI_LIMIT_PER_IP_DAY=100 \
+  LF_STORAGE_DIR="$STORE" APP_SALT=e2e-salt SHARE_ADMIN_KEY="$E2E_ADMIN_KEY" SHARE_LIMIT_PER_IP_DAY=50 \
+  php -S 127.0.0.1:$PORT -t . >/dev/null 2>&1 & PID=$!
 php -S 127.0.0.1:$SITEPORT -t tests/fixture_site >/dev/null 2>&1 & SPID=$!
-trap 'kill $PID $SPID 2>/dev/null; rm -f "$ROOT/$T"; rm -rf "$TMPSTORE"' EXIT
+trap 'kill $PID $SPID 2>/dev/null; rm -f "$ROOT/$T"; rm -rf "$TMPSTORE" "$STORE"' EXIT
 sleep 1
 OUT="$(timeout 120 "$CHROME" --headless=new --disable-gpu --no-sandbox --user-data-dir="$TMPSTORE" --virtual-time-budget=60000 \
   --dump-dom "http://127.0.0.1:$PORT/$T?site=http://127.0.0.1:$SITEPORT/#e2e" 2>/dev/null \

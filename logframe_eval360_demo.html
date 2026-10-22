@@ -723,6 +723,31 @@ button.mini:hover{border-color:var(--brand)}
 .rep-doc .kh{font:700 10px 'Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);margin-bottom:4px}
 .rep-doc .cav{font-size:11.5px;color:var(--ink-mute);border-top:1px solid var(--line);margin-top:18px;padding-top:10px}
 @media (max-width:760px){ .msg{max-width:100%} .chat{max-height:none} }
+/* ═══ Shared demo: the contact gate, the journey, the strip above a shared demo ═══ */
+body.gated .sb,body.gated .tb,body.gated .demo-strip,body.gated .sb-foot,body.gated .shared-strip{display:none}
+body.gated .app{grid-template-columns:minmax(0,1fr)}
+body.gated .content{grid-column:1}
+body.gated .main{padding:0;max-width:none}
+.gate-wrap{min-height:100vh;display:grid;place-items:center;padding:26px 20px;background:linear-gradient(150deg,var(--brand-deep),var(--brand))}
+.gate{width:100%;max-width:580px;background:var(--card);border-radius:16px;box-shadow:0 22px 64px rgba(8,22,40,.34);padding:30px 32px}
+.gate h1{font:700 25px/1.22 'Fraunces',serif;margin:0 0 9px}
+.gate .lead{color:var(--ink-soft);font-size:13.5px;line-height:1.65;margin:0 0 20px}
+.gate .fine{font-size:11.5px;color:var(--ink-mute);line-height:1.62;margin:16px 0 0}
+.gate .gmark{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.gate .gmark .gm{width:34px;height:34px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font:700 11px 'Fraunces',serif;flex-shrink:0}
+@media (max-width:520px){ .gate{padding:24px 20px} .gate h1{font-size:21px} }
+.jrny{display:grid;gap:10px}
+.jrny .st{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+.jrny .st b{width:28px;height:28px;border-radius:50%;background:var(--muted);color:var(--ink-soft);display:grid;place-items:center;font:700 12.5px 'Inter',sans-serif;flex-shrink:0}
+.jrny .st.now{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}
+.jrny .st.now b{background:var(--brand);color:#fff}
+.jrny .st.done b{background:var(--ok);color:#fff}
+.jrny .st h4{margin:0 0 3px;font:600 14px/1.4 'Inter',sans-serif}
+.jrny .st p{margin:0;font-size:12.5px;color:var(--ink-soft);line-height:1.6}
+.jrny .st .nowtag{font:700 9.5px 'Inter',sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--brand);margin-left:8px}
+.shared-strip{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;background:var(--brand-soft);color:var(--brand-deep);
+  border-bottom:1px solid var(--line);padding:9px 20px;font-size:12.5px;line-height:1.5}
+.shared-strip .sp{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -755,9 +780,11 @@ button.mini:hover{border-color:var(--brand)}
       <div class="tb-tools">
         <span class="chip grey" id="ai-pill" title="AI status"><i class="bi bi-stars"></i> AI</span>
         <button class="btn btn-sm" data-action="go" data-view="ask"><i class="bi bi-chat-dots"></i> <span class="hide-sm">Ask Eval360</span></button>
+        <button class="btn btn-sm" id="tb-share" data-action="sh-open" style="display:none"><i class="bi bi-link-45deg"></i> <span class="hide-sm">Share this demo</span></button>
         <button class="btn btn-sm btn-primary" data-action="go" data-view="setup"><i class="bi bi-stars"></i> <span class="hide-sm">Set up / import</span></button>
       </div>
     </header>
+    <div class="shared-strip" id="shared-strip" style="display:none"></div>
     <div class="demo-strip"><i class="bi bi-info-circle-fill"></i>
       <span id="demo-strip"><strong>DEMONSTRATION ENVIRONMENT</strong> — Organisation details come from its public website; frameworks come from uploaded logframes or are AI-drafted proposals. Progress, budget and reach figures are illustrative.</span></div>
     <main class="main" id="main"></main>
@@ -839,7 +866,8 @@ const appData = {
   log:[],            // audit trail
   settings:{tolerance:10},
   setup:null,        // the onboarding wizard's working state
-  ai:{checked:false, available:false, mock:false, model:'', remaining:null, limits:null}
+  share:null,        // the demo link: {slug, role:'owner'|'viewer', editToken, pass, url, meta}
+  ai:{checked:false, available:false, mock:false, model:'', remaining:null, limits:null, share:null}
 };
 const currentUser = {name:'You', title:'Programme team', role:'you'};
 const ROLE_LABEL = {you:'You'};
@@ -868,6 +896,8 @@ const NAV = [
     {key:'activity',   icon:'bi-clock-history',     label:'Audit trail'}]},
   {group:'Reports', items:[
     {key:'reports',    icon:'bi-file-earmark-text', label:'Reports & export'}]},
+  {group:'Working with us', items:[
+    {key:'journey',    icon:'bi-signpost-2',        label:'How we work'}]},
   {group:'Set-up', items:[
     {key:'setup',      icon:'bi-stars',             label:'Set up / import'},
     {key:'review',     icon:'bi-ui-checks',         label:'Review AI results'},
@@ -882,7 +912,8 @@ const navItem = key => NAV.flatMap(g => g.items).find(i => i.key === key);
 const navGroup = key => (NAV.find(g => g.items.some(i => i.key === key)) || {}).group || '';
 /* One visitor, full access — the shared UI helpers ask anyway. */
 const access = () => 'full';
-const viewAccess = v => v === 'review' && !(appData.setup && appData.setup.stage === 'review') ? 'none' : 'full';
+const viewAccess = v => v === 'review' && !(appData.setup && appData.setup.stage === 'review') ? 'none'
+  : v === 'gate' && !(appData.share && (appData.share.loading || appData.share.gate || appData.share.dead)) ? 'none' : 'full';
 const canEdit = () => true;
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1288,15 +1319,22 @@ function saveState(){
     const setup = appData.setup ? Object.assign({}, appData.setup, {uploads:[], programmes:(appData.setup.programmes || []).map(p => Object.assign({}, p, {payload:null}))}) : null;
     localStorage.setItem(STORE_KEY, JSON.stringify({v:2, org:appData.org, programmes:appData.programmes.map(p => Object.assign({}, p, {quarters:undefined})),
       current:appData.current, overrides:appData.overrides, log:appData.log.filter(e => e.live).slice(0, 300), settings:appData.settings, setup,
-      chat:(appData.chat || []).slice(-40), aiReports:(appData.aiReports || []).slice(-12), aiScope:appData.aiScope || 'org'}));
+      chat:(appData.chat || []).slice(-40), aiReports:(appData.aiReports || []).slice(-12), aiScope:appData.aiScope || 'org', share:appData.share}));
   } catch(e){ /* private window or storage full — the session still works */ }
+}
+/* Put a saved or shared set-up into the live state. One path, so a demo opened
+   from a link behaves exactly like one set up in this browser. */
+function hydrate(s){
+  if (!s || !s.org || !Array.isArray(s.programmes) || !s.programmes.length) return false;
+  Object.assign(appData, {org:s.org, programmes:s.programmes, current:s.current, overrides:s.overrides || {}, log:s.log || [],
+    settings:Object.assign(appData.settings, s.settings || {}), setup:s.setup || null, chat:Array.isArray(s.chat) ? s.chat : [], aiReports:Array.isArray(s.aiReports) ? s.aiReports : [], aiScope:s.aiScope || 'org'});
+  return true;
 }
 function loadState(){
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-    if (!s || s.v !== 2 || !s.org || !Array.isArray(s.programmes) || !s.programmes.length) return false;
-    Object.assign(appData, {org:s.org, programmes:s.programmes, current:s.current, overrides:s.overrides || {}, log:s.log || [],
-      settings:Object.assign(appData.settings, s.settings || {}), setup:s.setup || null, chat:Array.isArray(s.chat) ? s.chat : [], aiReports:Array.isArray(s.aiReports) ? s.aiReports : [], aiScope:s.aiScope || 'org'});
+    if (!s || s.v !== 2 || !hydrate(s)) return false;
+    appData.share = s.share && s.share.slug ? s.share : null;
     return true;
   } catch(e){ return false; }
 }
@@ -1620,10 +1658,13 @@ async function im_filePayload(file){
 async function im_checkStatus(){
   try {
     const d = await (await fetch(API_BASE + 'status.php', {cache:'no-store'})).json();
-    Object.assign(appData.ai, {checked:true, available:!!d.ai, mock:!!d.mock, model:d.model || '', remaining:d.remaining_today, limits:d.limits || null});
+    Object.assign(appData.ai, {checked:true, available:!!d.ai, mock:!!d.mock, model:d.model || '', remaining:d.remaining_today,
+      limits:d.limits || null, share:(d.share && typeof d.share === 'object') ? d.share : null});
   } catch(e){ Object.assign(appData.ai, {checked:true, available:false, offline:true}); }
   updateChrome();
-  if (currentView === 'setup') redraw();
+  // These screens are drawn from what the server allows, and the answer arrives
+  // after the first render; without this they state the opposite of the truth.
+  if (['setup', 'gate', 'journey', 'settings', 'about'].includes(currentView)) redraw();
 }
 async function apiPost(endpoint, body){
   let resp;
@@ -2607,8 +2648,25 @@ VIEW_RENDERERS['settings'] = () => {
           <div style="margin-top:16px"><button class="btn btn-sm btn-ghost" data-action="st-brand-reset">Reset to the Eval360 colours</button></div>`)}
       ${card('Monitoring', `<div class="form-grid"><div class="fld full"><label for="st-tol">Tolerance band</label>
           <select id="st-tol" data-action="st-tol">${[5,10,15,20].map(v => `<option value="${v}"${appData.settings.tolerance === v ? ' selected' : ''}>${v}% — up to ${v}% behind expected = needs attention</option>`).join('')}</select></div></div>
-          <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line-soft)"><div class="small" style="margin-bottom:8px">Remove your organisation, programmes and history from this browser.</div>
-          <button class="btn btn-sm btn-danger" data-action="st-reset"><i class="bi bi-trash3"></i> Start over</button></div>`)}</div>`;
+          <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line-soft)"><div class="small" style="margin-bottom:8px">Remove your organisation, programmes and history from this browser.
+            ${sh() && sh().role === 'owner' ? 'A demo link you have already created keeps working, and stays yours to revise.' : ''}</div>
+          <button class="btn btn-sm btn-danger" data-action="st-reset"><i class="bi bi-trash3"></i> Start over</button></div>`)}
+      ${card('Demo link', shRole() === 'viewer'
+        ? `<p class="small" style="margin:0 0 13px;line-height:1.7;color:var(--ink-soft)">You are reviewing a demo someone sent you. Anything you change here stays in your browser;
+            save your own copy to get a link that holds your version.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm" data-action="sh-fork"><i class="bi bi-files"></i> Save my own edited copy</button>
+            <button class="btn btn-sm" data-action="go" data-view="journey"><i class="bi bi-signpost-2"></i> How we work</button></div>`
+        : sh() && sh().role === 'owner'
+          ? `<p class="small" style="margin:0 0 11px;line-height:1.7;color:var(--ink-soft)">This set-up has a link. Anyone who opens it gives their name first.</p>
+            ${kvTable([['Link', `<input readonly value="${esc(shareUrlOf(sh()))}" style="width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:12.5px">`],
+              sh().meta && sh().meta.opens !== undefined ? ['Opened', sh().meta.opens ? plural(sh().meta.opens, 'time') : 'Not yet'] : null])}
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn btn-sm btn-primary" data-action="sh-copy" data-url="${esc(shareUrlOf(sh()))}"><i class="bi bi-clipboard"></i> Copy</button>
+              <button class="btn btn-sm" data-action="sh-save"><i class="bi bi-arrow-repeat"></i> Update with my latest changes</button></div>`
+          : `<p class="small" style="margin:0 0 13px;line-height:1.7;color:var(--ink-soft)">Turn this set-up into a link anyone can open. The reviewed set-up is saved on the server so the link works;
+              your uploaded documents never are.</p>
+            <button class="btn btn-sm btn-primary" data-action="sh-open" ${shareOn() && shareable() ? '' : 'disabled'}><i class="bi bi-link-45deg"></i> Create a link to this demo</button>
+            ${shareOn() ? (shareable() ? '' : '<p class="small muted" style="margin:10px 0 0">Set up your own organisation first — the sample is not worth sending on.</p>')
+              : '<p class="small muted" style="margin:10px 0 0">Demo links are not switched on for this site.</p>'}`)}</div>`;
 };
 function st_setColour(c){ c = hexOk(c); if (!c) return; const o = appData.org, was = o.brand.primary || 'Eval360'; o.brand.primary = c; saveState(); applyBrand();
   addLog('changed the brand colour', {view:'settings', meta:''}, 'bi-palette', {old:was, new:c, reason:'Branding'}); redraw(); }
@@ -2628,7 +2686,9 @@ CHANGES['st-tol'] = t => { const was = appData.settings.tolerance, before = stat
   redraw(); const a = statusCounts(); toast(`Tolerance ${was}% → ${t.value}%. Needs attention ${before.attention} → ${a.attention}, off track ${before.off} → ${a.off}.`, 'ok'); };
 ACTIONS['st-reset'] = () => {
   if (!confirm('Remove your organisation, programmes, edits and history from this browser?')) return;
-  clearState(); appData.log = []; appData.setup = null; loadSample(); showView('setup'); toast('Cleared. Set up your organisation, or explore the sample.', 'ok');
+  clearState(); appData.log = []; appData.setup = null; appData.share = null;
+  try { history.replaceState(null, '', location.pathname); } catch(e){}
+  loadSample(); showView('setup'); toast('Cleared. Set up your organisation, or explore the sample.', 'ok');
 };
 
 /* ═══ How this works ════════════════════════════════════════════════════════ */
@@ -2645,6 +2705,8 @@ VIEW_RENDERERS['about'] = () => {
           <li>Website pages and uploaded logframes are sent through this site to OpenAI to build the demo. Word and Excel files are converted in your browser first.</li>
           <li>This site does not store your documents. It counts AI requests per visitor per day and logs token usage for cost — never content.</li>
           <li>Your organisation, programmes and edits are kept only in this browser. Nobody else can see them. <b>Start over</b> in Settings removes them.</li>
+          <li>If you ask for a <b>demo link</b>, the reviewed set-up — results, indicators, baselines and targets as you accepted them — is saved on this server so the link can open it.
+            Your uploaded documents are still not saved. Everyone who opens the link gives their name, so you know who has reviewed it. Links are deleted after ${esc(String(shareCfg().ttl_days || 90))} days.</li>
           <li>Do not upload documents you are not permitted to share with a third-party AI service.</li></ul>
           <div style="margin-top:12px">${kvTable([['AI here', ai.available ? `${chip(ai.mock ? 'On — mock mode' : 'On', 'ok')} ${esc(ai.model)}` : chip(ai.offline ? 'Needs the hosted demo' : 'Not configured', 'warn')],
             ['AI requests left today', ai.remaining === null || ai.remaining === undefined ? '—' : num(ai.remaining)]])}</div>`)}</div>`
@@ -2871,6 +2933,314 @@ ACTIONS['rw-copy'] = async t => { const x = rw_get(t.dataset.id); if (!x) return
   try { await navigator.clipboard.writeText(rwText(x)); toast('Report copied as text.', 'ok'); } catch(e){ toast('Copy is not available in this browser — use Word or Print instead.', 'warn'); } };
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   29b. THE DEMO LINK — step two of how we work: "we will create a system demo,
+   and send you a link to review it".
+   Everything still runs in the browser. Asking for a link posts the reviewed
+   set-up — and only that, never the documents behind it — to api/share.php,
+   which returns an unguessable URL. Whoever opens it gives their name first,
+   sees the demo, and can keep an edited copy of their own.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const shareCfg = () => (appData.ai && appData.ai.share) || {};
+const shareOn = () => !!shareCfg().enabled;
+const sh = () => appData.share;
+const shRole = () => (sh() && sh().role) || null;
+const shareable = () => !!(appData.org && appData.programmes.length && !isSample());
+
+/* Slugs come back in URLs and in links the owner typed; check the shape before use. */
+const SLUG_RE = /^[a-z0-9]{12}$/;
+
+/* Links this browser owns, kept apart from the set-up so that "Start over"
+   does not lose the ability to revise a demo already sent to someone. */
+const LINKS_KEY = 'eval360.links.v1';
+const linksAll = () => { try { return JSON.parse(localStorage.getItem(LINKS_KEY) || '{}') || {}; } catch(e){ return {}; } };
+const linkToken = slug => (linksAll()[slug] || {}).t || null;
+function linkSave(slug, token){
+  try { const m = linksAll(); m[slug] = {t:token, at:TODAY_ISO}; localStorage.setItem(LINKS_KEY, JSON.stringify(m)); } catch(e){}
+}
+
+/* Exactly what saveState() keeps, minus the wizard — see lf_share_clean() on
+   the server, which drops uploads and pasted text again before storing. */
+const sharePayload = () => ({v:2, org:appData.org, programmes:appData.programmes.map(p => Object.assign({}, p, {quarters:undefined})),
+  current:appData.current, overrides:appData.overrides, log:appData.log.filter(e => e.live).slice(0, 300), settings:appData.settings,
+  chat:(appData.chat || []).slice(-40), aiReports:(appData.aiReports || []).slice(-12), aiScope:appData.aiScope || 'org'});
+
+const shareApi = (action, body) => apiPost('share.php', Object.assign({action}, body || {}));
+
+/**
+ * A shared set-up was built in somebody else's browser, so the URL, image and
+ * colour guards run again here — the same checks normaliseOrg applies at
+ * ingestion. Text is escaped at render; these are the fields that are not text.
+ */
+function sanitiseShared(s){
+  const o = s.org;
+  if (o){
+    o.website = safeUrl(o.website) || '';
+    if (Array.isArray(o.facts)) o.facts.forEach(f => { f.url = safeUrl(f.url); });
+    if (o.brand){ o.brand.logo = safeImg(o.brand.logo); o.brand.primary = hexOk(o.brand.primary); }
+    if (o.source && Array.isArray(o.source.pages)) o.source.pages = o.source.pages.filter(p => safeUrl(p && p.url)).map(p => Object.assign({}, p, {url:safeUrl(p.url)}));
+  }
+  (Array.isArray(s.programmes) ? s.programmes : []).forEach((p, i) => {
+    p.sourceUrl = safeUrl(p.sourceUrl);
+    p.colour = hexOk(p.colour) || PROG_COLOURS[i % PROG_COLOURS.length];
+  });
+  return s;
+}
+
+/* ── Opening a link ─────────────────────────────────────────────────────── */
+async function shareOpen(slug, token, pass){
+  appData.share = {slug, role:null, editToken:token || null, pass:pass || null, meta:null, gate:null, loading:true};
+  document.body.classList.add('gated');
+  showView('gate');
+  try {
+    const d = await shareApi('open', {slug, edit_token:token || null, pass:pass || null});
+    if (d.gate){
+      Object.assign(appData.share, {loading:false, gate:{org_name:d.org_name || '', programmes:Number(d.programmes) || 0}});
+      redraw();
+      return;
+    }
+    shareAdopt(d, slug, {editToken:d.edit_token || token || null, pass:pass || null});
+  } catch(e){
+    Object.assign(appData.share, {loading:false, dead:true, gateError:e.message});
+    redraw();
+  }
+}
+
+/* Make an opened demo the live set-up, and leave the gate behind. */
+function shareAdopt(d, slug, extra){
+  const payload = sanitiseShared(d.payload || {});
+  if (!hydrate(payload)){
+    Object.assign(appData.share || {}, {loading:false, dead:true, gateError:'This demo could not be opened — it may have been saved by an older version.'});
+    redraw();
+    return false;
+  }
+  appData.setup = null;
+  appData.share = Object.assign({slug, role:d.role === 'owner' ? 'owner' : 'viewer', meta:d.meta || null, url:null,
+    editToken:(d.role === 'owner' ? d.edit_token : null) || linkToken(slug) || null, pass:null}, extra || {});
+  // The token arrives in the URL when a demo is opened to be revised. Bank it
+  // here and take it out of the address bar, so the link in the browser bar is
+  // always the one that is safe to pass on.
+  if (appData.share.role === 'owner' && appData.share.editToken) linkSave(slug, appData.share.editToken);
+  if (SLUG_RE.test(slug)) try { history.replaceState(null, '', location.pathname + '?demo=' + encodeURIComponent(slug)); } catch(e){}
+  generateResults();
+  applyBrand();
+  saveState();
+  document.body.classList.remove('gated');
+  showView('dashboard');
+  return true;
+}
+
+/* ── The gate: who is opening this link ─────────────────────────────────── */
+VIEW_RENDERERS['gate'] = () => {
+  const s = sh() || {}, g = s.gate || {}, f = s.gateForm || {};
+  const head = `<div class="gmark"><div class="gm">E360</div><div class="small muted" style="font-weight:600;letter-spacing:.09em;text-transform:uppercase;font-size:10px">Eval360 · Monitoring, evaluation &amp; learning</div></div>`;
+  if (s.loading){
+    return `<div class="gate-wrap"><div class="gate">${head}
+      <h1>Opening your demo</h1>
+      <div class="busy"><div class="spin"></div><div class="small">Fetching the set-up for this link.</div></div></div></div>`;
+  }
+  if (s.dead){
+    return `<div class="gate-wrap"><div class="gate">${head}
+      <h1>This link is no longer available</h1>
+      <p class="lead">${esc(s.gateError || 'The demo has expired or the link is wrong.')} Demo links last ${esc(String(shareCfg().ttl_days || 90))} days.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" data-action="gate-leave"><i class="bi bi-stars"></i> Set up a demo on my own programmes</button></div>
+      <p class="fine">Or email ${esc(shareCfg().contact_email || '')} and we will send a new one.</p></div></div>`;
+  }
+  const whose = g.org_name ? `the Eval360 demo for ${g.org_name}` : 'your Eval360 demo';
+  return `<div class="gate-wrap"><div class="gate">${head}
+    <h1>${esc(whose.charAt(0).toUpperCase() + whose.slice(1))}</h1>
+    <p class="lead">${g.programmes ? esc(plural(g.programmes, 'programme')) + ' set up in Eval360 from your own results framework' : 'A demonstration set up from your own results framework'} —
+      executive dashboard, logframe matrix, results chain, indicators, verification and reports. Tell us who you are and it opens.</p>
+    ${s.gateError ? banner('bad', 'bi-exclamation-octagon', esc(s.gateError)) : ''}
+    <form id="gate-form" data-action="gate-form"><div class="form-grid">
+      <div class="fld"><label for="g-name">Your name</label><input id="g-name" name="name" required autocomplete="name" value="${esc(f.name || '')}" ${s.gateBusy ? 'disabled' : ''}></div>
+      <div class="fld"><label for="g-email">Work email</label><input id="g-email" name="email" type="email" required autocomplete="email" value="${esc(f.email || '')}" ${s.gateBusy ? 'disabled' : ''}></div>
+      <div class="fld"><label for="g-org">Organisation</label><input id="g-org" name="org" autocomplete="organization" value="${esc(f.org || g.org_name || '')}" ${s.gateBusy ? 'disabled' : ''}></div>
+      <div class="fld"><label for="g-role">Your role <span class="muted">(optional)</span></label><input id="g-role" name="role" value="${esc(f.role || '')}" ${s.gateBusy ? 'disabled' : ''}></div></div>
+      <div style="margin-top:17px"><button class="btn btn-primary" type="submit" ${s.gateBusy ? 'disabled' : ''}>${s.gateBusy
+        ? '<div class="spin" style="width:13px;height:13px;border-width:2px"></div> Opening…'
+        : '<i class="bi bi-box-arrow-in-right"></i> Open the demo'}</button></div></form>
+    <p class="fine"><i class="bi bi-shield-check"></i> We use this to follow up on the demo and arrange a discovery meeting — nothing else, and we do not pass it on.
+      Progress, budget and reach figures in the demo are illustrative, generated to show how Eval360 tracks results.</p></div></div>`;
+};
+SUBMITS['gate-form'] = async (form, fd) => {
+  const s = sh();
+  if (!s || !s.slug) return;
+  s.gateForm = {name:String(fd.get('name') || '').trim(), email:String(fd.get('email') || '').trim(),
+                org:String(fd.get('org') || '').trim(), role:String(fd.get('role') || '').trim()};
+  s.gateError = null; s.gateBusy = true; redraw();
+  try {
+    const d = await shareApi('unlock', {slug:s.slug, lead:s.gateForm});
+    shareAdopt(d, s.slug, {pass:d.pass || null});
+  } catch(e){
+    s.gateBusy = false; s.gateError = e.message; redraw();
+  }
+};
+ACTIONS['gate-leave'] = () => {
+  appData.share = null;
+  document.body.classList.remove('gated');
+  history.replaceState(null, '', location.pathname);
+  loadSample(); saveState(); showView('setup');
+};
+
+/* ── Creating and revising a link ───────────────────────────────────────── */
+ACTIONS['sh-open'] = () => {
+  const s = sh();
+  if (s && s.role === 'owner' && s.slug) return shareLinkModal(shareUrlOf(s), true, false);
+  shareCreateModal();
+};
+/* The link, wherever it is shown or copied. The server builds it, so it goes
+   through the same URL guard as anything else from outside — and if it does not
+   pass, it is rebuilt from the slug rather than shown as it came. */
+function shareUrlOf(s){
+  if (!s) return '';
+  const given = safeUrl(s.url);
+  if (given) return given;
+  return SLUG_RE.test(String(s.slug || '')) ? (safeUrl(location.origin + location.pathname + '?demo=' + s.slug) || '') : '';
+}
+
+function shareCreateModal(){
+  if (!shareOn()){ toast('Demo links are not switched on for this site.', 'warn'); return; }
+  if (!shareable()){ toast(appData.org && isSample() ? 'Set up your own organisation first — the sample is not worth sending on.' : 'Set up your organisation first.', 'warn'); return; }
+  const o = appData.org;
+  openModal({title:'Send this demo as a link', body:`<form id="sh-create-form" data-action="sh-create-form">
+    <p class="small" style="margin:0 0 16px;line-height:1.65;color:var(--ink-soft)">We save this set-up — ${esc(plural(appData.programmes.length, 'programme'))}, as you reviewed it — and give you a link
+      anyone can open. Your uploaded documents are not saved, here or anywhere.</p>
+    <div class="form-grid">
+      <div class="fld"><label for="sh-name">Your name</label><input id="sh-name" name="name" required autocomplete="name"></div>
+      <div class="fld"><label for="sh-email">Work email</label><input id="sh-email" name="email" type="email" required autocomplete="email"></div>
+      <div class="fld"><label for="sh-org">Organisation</label><input id="sh-org" name="org" autocomplete="organization" value="${esc(o.name || '')}"></div>
+      <div class="fld"><label for="sh-role">Your role <span class="muted">(optional)</span></label><input id="sh-role" name="role"></div></div>
+    <p class="small muted" style="margin:14px 0 0;line-height:1.6"><i class="bi bi-shield-check"></i> So we can follow the demo up with you and arrange a discovery meeting.
+      The link lasts ${esc(String(shareCfg().ttl_days || 90))} days and is then deleted.</p>
+    <div style="margin-top:17px"><button class="btn btn-primary" type="submit"><i class="bi bi-link-45deg"></i> Create the link</button></div></form>`});
+}
+SUBMITS['sh-create-form'] = async (form, fd) => {
+  const btn = form.querySelector('button[type=submit]');
+  if (btn){ btn.disabled = true; btn.innerHTML = '<div class="spin" style="width:13px;height:13px;border-width:2px"></div> Saving…'; }
+  try {
+    const d = await shareApi('create', {payload:sharePayload(), lead:{name:String(fd.get('name') || '').trim(), email:String(fd.get('email') || '').trim(),
+      org:String(fd.get('org') || '').trim(), role:String(fd.get('role') || '').trim()}});
+    appData.share = {slug:d.slug, role:'owner', editToken:d.edit_token, pass:null, url:d.url, meta:d.meta || null};
+    linkSave(d.slug, d.edit_token);
+    addLog('created a link to this demo', {view:'journey', meta:''}, 'bi-link-45deg', {old:'in this browser only', new:'shareable link', reason:'Step two: send the demo to be reviewed'});
+    saveState();
+    shareLinkModal(d.url, true, true);
+    redraw();
+  } catch(e){
+    if (btn){ btn.disabled = false; btn.innerHTML = '<i class="bi bi-link-45deg"></i> Create the link'; }
+    toast(e.message, 'bad');
+  }
+};
+
+function shareLinkModal(url, owner, justMade){
+  const safe = safeUrl(url) || '';
+  openModal({title:justMade ? 'Your demo link is ready' : 'Your demo link', body:`
+    ${justMade ? banner('ok', 'bi-check2-circle', 'Saved. Anyone with this link can open the demo — they give their name first, so you know who has seen it.') : ''}
+    <div class="fld"><label for="sh-url">The link</label><input id="sh-url" readonly value="${esc(url)}"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn btn-primary btn-sm" data-action="sh-copy" data-url="${esc(url)}"><i class="bi bi-clipboard"></i> Copy the link</button>
+      ${safe ? `<a class="btn btn-sm" href="${esc(safe)}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Open it</a>` : ''}
+      ${owner ? `<button class="btn btn-sm" data-action="sh-save"><i class="bi bi-arrow-repeat"></i> Update it with my latest changes</button>` : ''}
+      <button class="btn btn-sm" data-action="sh-meeting"><i class="bi bi-calendar-check"></i> Book the discovery meeting</button></div>
+    <p class="small muted" style="margin:15px 0 0;line-height:1.65">Send it to anyone who should see it. Keep editing here and press
+      <b>Update it</b> whenever you want the link to show your newest version. The link lasts ${esc(String(shareCfg().ttl_days || 90))} days.</p>`});
+}
+ACTIONS['sh-copy'] = async t => {
+  try { await navigator.clipboard.writeText(t.dataset.url); toast('Link copied.', 'ok'); }
+  catch(e){ const i = document.getElementById('sh-url'); if (i){ i.focus(); i.select(); } toast('Copy it from the box above.', 'warn'); }
+};
+ACTIONS['sh-save'] = async () => {
+  const s = sh();
+  if (!s || s.role !== 'owner' || !s.editToken){ toast('This demo is not yours to change.', 'warn'); return; }
+  try {
+    const d = await shareApi('save', {slug:s.slug, edit_token:s.editToken, payload:sharePayload()});
+    s.meta = d.meta || s.meta; s.url = d.url || s.url;
+    saveState();
+    toast(`Link updated — revision ${d.revision}. Anyone opening it now sees these changes.`, 'ok');
+    redraw();
+  } catch(e){ toast(e.message, 'bad'); }
+};
+/* A viewer who changes something keeps their own copy; the demo they were sent is untouched. */
+ACTIONS['sh-fork'] = async () => {
+  const s = sh();
+  if (!s || !s.slug){ toast('There is nothing to copy.', 'warn'); return; }
+  try {
+    const d = await shareApi('fork', {slug:s.slug, pass:s.pass || null, payload:sharePayload()});
+    appData.share = {slug:d.slug, role:'owner', editToken:d.edit_token, pass:null, url:d.url, meta:d.meta || null};
+    linkSave(d.slug, d.edit_token);
+    history.replaceState(null, '', location.pathname + '?demo=' + encodeURIComponent(d.slug));
+    addLog('saved an own copy of the shared demo', {view:'journey', meta:''}, 'bi-files', {old:'read-only copy', new:'my own link', reason:'Edited for our context'});
+    saveState();
+    shareLinkModal(d.url, true, true);
+    redraw();
+  } catch(e){ toast(e.message, 'bad'); }
+};
+/* Step three. The click is recorded so the meeting can be followed up even if the booking page is never reached. */
+ACTIONS['sh-meeting'] = () => {
+  const s = sh(), url = safeUrl(shareCfg().meeting_url);
+  if (s && s.slug) shareApi('event', {slug:s.slug, kind:'meeting', pass:s.pass || null}).catch(() => {});
+  if (url){ window.open(url, '_blank', 'noopener'); toast('Opening the booking page.', 'ok'); return; }
+  const em = shareCfg().contact_email, ph = shareCfg().contact_phone;
+  openModal({title:'Book a discovery meeting', body:`<p class="small" style="margin:0 0 14px;line-height:1.7;color:var(--ink-soft)">
+      In the discovery meeting we go through what you have seen and revise the demo to suit how your organisation actually works — step three of how we work.</p>
+    ${kvTable([em ? ['Email', `<a href="mailto:${esc(em)}">${esc(em)}</a>`] : null, ph ? ['Phone', esc(ph)] : null])}`});
+};
+
+/* ── How we work: the seven steps ───────────────────────────────────────── */
+const JOURNEY = [
+  ['Share your documents', 'Send us any project document you have — a report, your current logframe, an M&E plan. Or upload it on this site and the demo builds itself.'],
+  ['We build your demo', 'Eval360 is set up on your own results framework and you get a link to review it, in your organisation’s colours.'],
+  ['Discovery meeting', 'We talk through what you have seen and revise the demo to suit your operational context.'],
+  ['Contract', 'If you are happy with the demo, we proceed to contract signing: 50% of the fees to start, and 50% after four months.'],
+  ['Go live', 'We put the system live for you, issue your credentials, migrate your data and train your team on how to use it.'],
+  ['Adoption', 'We walk the journey with you until the system is fully adopted across your team.'],
+  ['Your own consultant', 'You get a dedicated consultant for support on both the technology and the M&E.']
+];
+/* Which step the visitor is standing on: reviewing a demo is step two, and a
+   demo that has not been shared yet means the documents are already in. */
+const journeyNow = () => isSample() ? 1 : 2;
+
+VIEW_RENDERERS['journey'] = () => {
+  const now = journeyNow(), s = sh(), o = appData.org, viewer = shRole() === 'viewer';
+  const steps = `<div class="jrny mb">${JOURNEY.map(([t, d], i) => {
+    const k = i + 1, cls = k < now ? ' done' : k === now ? ' now' : '';
+    return `<div class="st${cls}"><b>${k < now ? '<i class="bi bi-check"></i>' : k}</b>
+      <div><h4>${esc(t)}${k === now ? '<span class="nowtag">You are here</span>' : ''}</h4><p>${esc(d)}</p></div></div>`;
+  }).join('')}</div>`;
+
+  const cta = card('Next: a discovery meeting', `<p class="small" style="margin:0 0 14px;line-height:1.7;color:var(--ink-soft)">
+      ${viewer ? 'This demo was built so you could see Eval360 on your own framework before talking to anyone.' : 'When you have looked round, the next step is a conversation.'}
+      In the meeting we go through what you have seen and revise the demo to suit how your organisation actually works.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" data-action="sh-meeting"><i class="bi bi-calendar-check"></i> Book the discovery meeting</button>
+      ${viewer ? '<button class="btn" data-action="sh-fork"><i class="bi bi-files"></i> Save my own edited copy</button>'
+        : shareOn() && shareable() ? `<button class="btn" data-action="sh-open"><i class="bi bi-link-45deg"></i> ${s && s.role === 'owner' ? 'Show my demo link' : 'Create a link to this demo'}</button>` : ''}</div>
+    ${shareCfg().contact_email ? `<p class="small muted" style="margin:14px 0 0">Or email <a href="mailto:${esc(shareCfg().contact_email)}">${esc(shareCfg().contact_email)}</a>${shareCfg().contact_phone ? ' · ' + esc(shareCfg().contact_phone) : ''}.</p>` : ''}`);
+
+  const linkCard = s && s.role === 'owner' && s.slug
+    ? card('Your demo link', `${kvTable([
+        ['Link', `<input readonly id="sh-url" value="${esc(shareUrlOf(s))}" style="width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:12.5px">`],
+        s.meta && s.meta.opens !== undefined ? ['Opened', s.meta.opens ? plural(s.meta.opens, 'time') : 'Not yet'] : null,
+        s.meta && s.meta.revision ? ['Revision', num(s.meta.revision)] : null,
+        s.meta && s.meta.expires_at ? ['Expires', esc(String(s.meta.expires_at).slice(0, 10))] : null])}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:13px">
+        <button class="btn btn-sm btn-primary" data-action="sh-copy" data-url="${esc(shareUrlOf(s))}"><i class="bi bi-clipboard"></i> Copy</button>
+        <button class="btn btn-sm" data-action="sh-save"><i class="bi bi-arrow-repeat"></i> Update with my latest changes</button></div>
+      <p class="small muted" style="margin:13px 0 0;line-height:1.6">Everyone who opens it gives their name first, so you know who has reviewed it.</p>`)
+    : viewer
+      ? card('This demo was prepared for you', `<p class="small" style="margin:0;line-height:1.7;color:var(--ink-soft)">
+          You are looking at ${esc(o ? o.name : 'this organisation')} in Eval360. Change anything you like — targets, tolerance, branding — it only affects your view.
+          <b>Save my own edited copy</b> turns your changes into a link of your own, and leaves the one you were sent as it was.</p>`)
+      : card('Send this demo to a colleague', `<p class="small" style="margin:0 0 13px;line-height:1.7;color:var(--ink-soft)">
+          Right now this set-up lives only in this browser. A link saves the reviewed set-up — never your uploaded documents — so anyone you send it to sees exactly what you see.</p>
+        ${shareOn() ? `<button class="btn btn-primary" data-action="sh-open" ${shareable() ? '' : 'disabled'}><i class="bi bi-link-45deg"></i> Create a link to this demo</button>
+          ${shareable() ? '' : '<p class="small muted" style="margin:10px 0 0">Set up your own organisation first.</p>'}`
+        : '<p class="small muted" style="margin:0">Demo links are not switched on for this site.</p>'}`);
+
+  return pageHead('How we work', 'From your first document to a system your team has adopted — seven steps.')
+    + steps + `<div class="grid-2">${cta}${linkCard}</div>`;
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
    30. ROUTER — one dispatcher: sidebar (with the programme switcher), topbar,
    renderer, charts.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -2911,6 +3281,24 @@ function updateChrome(){
   const t = document.getElementById('check-chip-text');
   if (t && o){ const q = orgIssues().filter(x => x.sev !== 'info').length; t.textContent = q ? `${plural(q, 'framework gap')}` : 'Frameworks complete'; }
   document.title = o && !isSample() ? `${o.short} · Eval360` : 'Eval360 · Your organisation';
+  const shBtn = document.getElementById('tb-share');
+  // A viewer is offered "Save my own copy" in the strip instead — sharing on
+  // someone else's demo would mean passing on a link that is not theirs.
+  if (shBtn) shBtn.style.display = shareOn() && shareable() && shRole() !== 'viewer' ? '' : 'none';
+  // The strip above a shared demo: who it was built for, and the way onward.
+  const strip = document.getElementById('shared-strip'), ss = sh();
+  const stripOn = !!(ss && ss.role && !document.body.classList.contains('gated'));
+  if (strip){
+    strip.style.display = stripOn ? '' : 'none';
+    if (stripOn) strip.innerHTML = `<i class="bi bi-stars"></i><span>${ss.role === 'viewer'
+        ? `This Eval360 demo was built for <b>${esc(o ? o.name : '')}</b> from your own results framework.`
+        : `Your demo link is live${ss.meta && ss.meta.opens ? ' — opened ' + esc(plural(ss.meta.opens, 'time')) : ''}.`}</span>
+      <span class="sp"><button class="btn btn-sm btn-primary" data-action="sh-meeting"><i class="bi bi-calendar-check"></i> Book a discovery meeting</button>
+        ${ss.role === 'viewer'
+          ? '<button class="btn btn-sm" data-action="sh-fork"><i class="bi bi-files"></i> Save my own copy</button>'
+          : `<button class="btn btn-sm" data-action="sh-copy" data-url="${esc(shareUrlOf(ss))}"><i class="bi bi-clipboard"></i> Copy link</button>`}
+        <button class="btn btn-sm" data-action="go" data-view="journey">How we work</button></span>`;
+  }
 }
 function showView(name, meta){
   if (!VIEW_RENDERERS[name] || viewAccess(name) === 'none'){ name = appData.org ? 'dashboard' : 'setup'; meta = ''; }
@@ -3072,6 +3460,40 @@ function selfTest(){
   appData.setup = {stage:'org', form:{name:'', website:'', country:'', description:''}, uploads:[{key:'u1', filename:H, payload:{kind:'text', chars:200}, error:null}, {key:'u2', filename:'b.pdf', payload:null, error:H}], lfOrg:H, programmes:[]};
   try { const h = VIEW_RENDERERS['setup'](''); if (BAD.test(h)) out.push('FAIL setup uploads: unescaped markup'); } catch(e){ out.push(`FAIL setup uploads: ${e.message}`); }
   appData.setup = null;
+  // 4b · A shared demo. The payload came out of somebody else's browser, so the
+  // guards run again on adoption and every screen that shows it must stay inert.
+  const shBad = {org:Object.assign({}, horg, {website:'javascript:alert(1)', brand:{primary:'red;background:url(x)', logo:'javascript:alert(1)'},
+      facts:[{statement:H, url:'javascript:alert(1)'}],
+      source:{kind:'website', model:H, pages:[{url:'javascript:alert(1)', title:H}, {url:'https://example.org/', title:H}]}}),
+    programmes:[{id:'P1', name:H, sourceUrl:'javascript:alert(1)', colour:'red;background:url(x)'}]};
+  sanitiseShared(shBad);
+  check('Shared payload: unsafe link, logo, colour and cited page dropped on adoption',
+    [shBad.org.website, shBad.org.brand.logo, shBad.org.brand.primary, shBad.org.facts[0].url,
+     shBad.org.source.pages.length, shBad.programmes[0].sourceUrl, shBad.programmes[0].colour],
+    ['', null, null, null, 1, null, PROG_COLOURS[0]]);
+  check('A demo link is never allowed to be a javascript: URL', [safeUrl('javascript:alert(1)'), safeUrl('https://x.example/?demo=abcdef123456')],
+    [null, 'https://x.example/?demo=abcdef123456']);
+  // The gate shows the organisation's name as the server stored it — another
+  // visitor's text, before anything has been reviewed.
+  ['loading', 'gate', 'dead'].forEach(st => {
+    appData.share = {slug:'abcdef123456', role:null, loading:st === 'loading', dead:st === 'dead',
+      gate:st === 'gate' ? {org_name:H, programmes:3} : null, gateError:H, gateForm:{name:H, email:H, org:H, role:H}};
+    check(`Gate (${st}) is a screen only while a link is being opened`, viewAccess('gate'), 'full');
+    try { pendingMounts = []; const h = VIEW_RENDERERS['gate'](''); if (BAD.test(h)) out.push(`FAIL gate ${st}: unescaped markup`); }
+    catch(e){ out.push(`FAIL gate ${st}: ${e && e.message}`); }
+  });
+  loadSample();
+  ['owner', 'viewer'].forEach(role => {
+    appData.share = {slug:'abcdef123456', role, editToken:'0123456789abcdef0123456789abcdef', pass:'1.abc', url:'javascript:alert(1)',
+      meta:{opens:2, revision:3, expires_at:H, org_name:H}};
+    ['journey', 'settings', 'about'].forEach(v => {
+      try { pendingMounts = []; const h = VIEW_RENDERERS[v](''); pendingMounts = [];
+        if (BAD.test(h)) out.push(`FAIL ${v} (shared, ${role}): unescaped markup or unsafe link`); }
+      catch(e){ out.push(`FAIL ${v} (shared, ${role}): ${e && e.message}`); }
+    });
+  });
+  appData.share = null;
+  check('Gate is unreachable once no link is being opened', viewAccess('gate'), 'none');
   // 5 · Ask Eval360 and AI reports: hostile model output must render inert
   loadSample();
   const ctx = aiContext('org');
@@ -3102,9 +3524,17 @@ function selfTest(){
 (function init(){
   const hash = location.hash.replace('#', '');
   if (hash === 'selftest'){ loadSample(); selfTest(); showView('dashboard'); return; }
+  const q = new URLSearchParams(location.search);
+  const slug = String(q.get('demo') || '').trim().toLowerCase(), tokenIn = String(q.get('t') || '').trim();
   const returning = loadState();
   if (returning){ generateResults(); applyBrand(); } else loadSample();
   im_checkStatus();
+  /* Someone followed a demo link: open that demo, whatever this browser holds. */
+  if (SLUG_RE.test(slug)){
+    const prev = appData.share && appData.share.slug === slug ? appData.share : null;
+    shareOpen(slug, tokenIn || (prev && prev.editToken) || linkToken(slug), prev && prev.pass);
+    return;
+  }
   const [v, m] = hash.split('/'), meta = decodeURIComponent(m || '');
   if (v && VIEW_RENDERERS[v]){ if (meta.includes('=') && !DETAIL_VIEWS[v]){ FILTERS[v] = parseMeta(meta); showView(v, ''); } else showView(v, meta); }
   else showView(appData.setup && appData.setup.stage === 'review' ? 'review' : returning ? 'dashboard' : 'setup');
