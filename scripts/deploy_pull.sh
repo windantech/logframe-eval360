@@ -30,7 +30,7 @@ ERROR: this folder is not a git repository.
 
 First-time setup on the server:
   cd /home/vantage/domains/eval360.tech/public_html/mel
-  git clone https://github.com/windantech/logframe-eval360.git caaz
+  git clone https://github.com/windantech/logframe-eval360.git logframe
   cd logframe
   bash scripts/deploy_pull.sh
 MSG
